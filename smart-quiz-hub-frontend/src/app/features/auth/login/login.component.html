@@ -1,0 +1,131 @@
+<div class="min-h-screen flex">
+
+  <!-- ─── Left Panel ─────────────────────────────────────── -->
+  <div class="hidden lg:flex lg:w-[55%] relative overflow-hidden bg-[#0A0910] items-center justify-center p-16">
+
+    <!-- Animated blobs -->
+    <div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-600/30 rounded-full mix-blend-screen filter blur-3xl animate-blob"></div>
+    <div class="absolute bottom-[-10%] right-[-5%] w-80 h-80 bg-violet-600/25 rounded-full mix-blend-screen filter blur-3xl animate-blob animation-delay-2000"></div>
+    <div class="absolute top-[40%] right-[20%] w-64 h-64 bg-cyan-500/20 rounded-full mix-blend-screen filter blur-3xl animate-blob animation-delay-4000"></div>
+
+    <!-- Grid overlay -->
+    <div class="absolute inset-0 opacity-[0.03]"
+         style="background-image: linear-gradient(rgba(255,255,255,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.5) 1px, transparent 1px); background-size: 40px 40px;">
+    </div>
+
+    <div class="relative z-10 max-w-md">
+      <!-- Logo -->
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center mb-8 shadow-2xl shadow-indigo-500/40">
+        <span class="material-icons text-white text-3xl">psychology</span>
+      </div>
+
+      <h1 class="text-4xl font-extrabold text-white leading-tight tracking-tight mb-4">
+        Smart Quiz<br>
+        <span class="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">AI Hub</span>
+      </h1>
+
+      <p class="text-white/50 text-base leading-relaxed mb-10">
+        Accenture's centralized MCQ management platform — create, review, and manage questions powered by AI.
+      </p>
+
+      <div class="space-y-4">
+        @for (feat of features; track feat.text) {
+          <div class="flex items-center gap-4">
+            <div class="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0">
+              <span class="material-icons text-indigo-400 text-[17px]">{{ feat.icon }}</span>
+            </div>
+            <span class="text-white/60 text-sm">{{ feat.text }}</span>
+          </div>
+        }
+      </div>
+
+      <!-- Bottom badge -->
+      <div class="mt-14 flex items-center gap-3">
+        <div class="h-px flex-1 bg-white/10"></div>
+        <span class="text-white/25 text-xs font-medium">Hack-N-Stack 2026 · Accenture L&TT</span>
+        <div class="h-px flex-1 bg-white/10"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Right Panel ─────────────────────────────────────── -->
+  <div class="flex-1 flex items-center justify-center bg-white px-8 py-12">
+    <div class="w-full max-w-[400px]">
+
+      <!-- Mobile logo -->
+      <div class="lg:hidden flex items-center gap-3 mb-10">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
+          <span class="material-icons text-white text-[18px]">psychology</span>
+        </div>
+        <span class="font-bold text-slate-900 text-lg">SmartQuiz AI Hub</span>
+      </div>
+
+      <div class="mb-8">
+        <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">Welcome back</h2>
+        <p class="text-slate-500 mt-2 text-sm">Sign in with your Accenture credentials</p>
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-5">
+
+        <!-- Enterprise ID -->
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Enterprise ID</label>
+          <div class="relative">
+            <span class="material-icons absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">badge</span>
+            <input formControlName="enterpriseId"
+                   autocomplete="username"
+                   placeholder="firstname.lastname"
+                   class="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all bg-slate-50 focus:bg-white" />
+          </div>
+          @if (form.get('enterpriseId')?.hasError('required') && form.get('enterpriseId')?.touched) {
+            <p class="text-xs text-rose-500 mt-1.5 flex items-center gap-1">
+              <span class="material-icons text-[13px]">error</span> Enterprise ID is required
+            </p>
+          }
+        </div>
+
+        <!-- Password -->
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
+          <div class="relative">
+            <span class="material-icons absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">lock</span>
+            <input formControlName="password"
+                   [type]="showPass() ? 'text' : 'password'"
+                   autocomplete="current-password"
+                   placeholder="••••••••"
+                   class="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all bg-slate-50 focus:bg-white" />
+            <button type="button" (click)="showPass.set(!showPass())"
+                    class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+              <span class="material-icons text-[18px]">{{ showPass() ? 'visibility_off' : 'visibility' }}</span>
+            </button>
+          </div>
+          @if (form.get('password')?.hasError('required') && form.get('password')?.touched) {
+            <p class="text-xs text-rose-500 mt-1.5 flex items-center gap-1">
+              <span class="material-icons text-[13px]">error</span> Password is required
+            </p>
+          }
+        </div>
+
+        <!-- Submit -->
+        <button type="submit"
+                [disabled]="form.invalid || loading()"
+                class="w-full py-3.5 px-6 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 mt-2">
+          @if (loading()) {
+            <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            Signing in...
+          } @else {
+            <span class="material-icons text-[18px]">login</span>
+            Sign In
+          }
+        </button>
+      </form>
+
+      <p class="text-center text-xs text-slate-400 mt-8">
+        Hack-N-Stack 2026 · Accenture L&TT
+      </p>
+    </div>
+  </div>
+</div>

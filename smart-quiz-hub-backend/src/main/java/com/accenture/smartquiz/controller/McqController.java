@@ -1,0 +1,124 @@
+package com.accenture.smartquiz.controller;
+
+import com.accenture.smartquiz.dto.request.McqRequest;
+import com.accenture.smartquiz.dto.response.*;
+import com.accenture.smartquiz.entity.enums.Difficulty;
+import com.accenture.smartquiz.entity.enums.McqStatus;
+import com.accenture.smartquiz.security.SmartQuizUserDetails;
+import com.accenture.smartquiz.service.McqService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+@RestController
+@RequestMapping("/questions")
+@RequiredArgsConstructor
+@Tag(name = "MCQ Questions", description = "Create, edit, and manage MCQ questions")
+public class McqController {
+
+    private final McqService mcqService;
+
+    @PostMapping
+    @Operation(summary = "Create a new MCQ question (saved as DRAFT)")
+    public ResponseEntity<ApiResponse<McqResponse>> create(
+            @Valid @RequestBody McqRequest request,
+            @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Question created successfully", mcqService.createQuestion(request, currentUser)));
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Update an existing MCQ question")
+    public ResponseEntity<ApiResponse<McqResponse>> update(
+            @PathVariable Long id,
+            @Valid @RequestBody McqRequest request,
+            @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
+        return ResponseEntity.ok(ApiResponse.success("Question updated successfully",
+                mcqService.updateQuestion(id, request, currentUser)));
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Get a single MCQ question by ID")
+    public ResponseEntity<ApiResponse<McqResponse>> getOne(
+            @PathVariable Long id,
+            @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
+        return ResponseEntity.ok(ApiResponse.success(mcqService.getQuestion(id, currentUser)));
+    }
+
+    @GetMapping("/my")
+    @Operation(summary = "Get questions created by the current user")
+    public ResponseEntity<ApiResponse<PagedResponse<McqResponse>>> getMyQuestions(
+            @RequestParam(required = false) McqStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
+        var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return ResponseEntity.ok(ApiResponse.success(mcqService.getMyQuestions(status, currentUser, pageable)));
+    }
+
+    @GetMapping
+    @Operation(summary = "Get all questions (admin: all, SME: own + assigned)")
+    public ResponseEntity<ApiResponse<PagedResponse<McqResponse>>> getAll(
+            @RequestParam(required = false) McqStatus status,
+            @RequestParam(required = false) Long stackId,
+            @RequestParam(required = false) Difficulty difficulty,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
+        var pageable = PageRequest.of(page, size, Sort.by("updatedAt").descending());
+        return ResponseEntity.ok(ApiResponse.success(
+                mcqService.getAllQuestions(status, stackId, difficulty, currentUser, pageable)));
+    }
+
+    @PostMapping("/{id}/submit")
+    @Operation(summary = "Submit a DRAFT question for review")
+    public ResponseEntity<ApiResponse<McqResponse>> submit(
+            @PathVariable Long id,
+            @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
+        return ResponseEntity.ok(ApiResponse.success("Question submitted for review",
+                mcqService.submitForReview(id, currentUser)));
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Delete a question")
+    public ResponseEntity<ApiResponse<Void>> delete(
+            @PathVariable Long id,
+            @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
+        mcqService.deleteQuestion(id, currentUser);
+        return ResponseEntity.ok(ApiResponse.success("Question deleted successfully"));
+    }
+
+    @GetMapping("/dashboard/stats")
+    @Operation(summary = "Get dashboard statistics for current user")
+    public ResponseEntity<ApiResponse<DashboardStatsResponse>> getStats(
+            @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
+        return ResponseEntity.ok(ApiResponse.success(mcqService.getDashboardStats(currentUser)));
+    }
+
+    @PostMapping(value = "/bulk-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Bulk upload MCQ questions from XLSX file")
+    public ResponseEntity<ApiResponse<BulkUploadResponse>> bulkUpload(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
+        String originalFilename = file.getOriginalFilename();
+        String contentType = file.getContentType();
+        boolean validExtension = originalFilename != null && originalFilename.toLowerCase().endsWith(".xlsx");
+        boolean validMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".equals(contentType)
+                || "application/octet-stream".equals(contentType);
+        if (!validExtension || !validMime) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Only .xlsx files are accepted"));
+        }
+        BulkUploadResponse response = mcqService.bulkUpload(file, currentUser);
+        return ResponseEntity.ok(ApiResponse.success("Bulk upload processed", response));
+    }
+}
