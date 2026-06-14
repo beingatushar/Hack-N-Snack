@@ -123,6 +123,39 @@ export interface SmeUserResponse {
   approvedQuestions: number;
 }
 
+// ── Super-admin user management ───────────────────────────────────────────────
+
+export interface AdminUser {
+  id: number;
+  enterpriseId: string;
+  fullName: string;
+  email: string;
+  role: UserRole;
+  active: boolean;
+  stacks: StackSummary[];
+  totalQuestions: number;
+  approvedQuestions: number;
+  reviewedQuestions: number;
+  createdAt: string;
+}
+
+export interface CreateUserRequest {
+  enterpriseId: string;
+  fullName: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  stackIds?: number[];
+}
+
+export interface UpdateUserRequest {
+  fullName: string;
+  email: string;
+  role: UserRole;
+  active: boolean;
+  stackIds?: number[];
+}
+
 export interface BulkUploadResponse {
   totalRows: number;
   successCount: number;

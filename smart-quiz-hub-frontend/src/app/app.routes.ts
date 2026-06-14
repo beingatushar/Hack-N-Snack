@@ -58,6 +58,12 @@ export const routes: Routes = [
         canActivate: [adminGuard],
         loadComponent: () =>
           import('./features/admin/stack-management/stack-management.component').then(m => m.StackManagementComponent)
+      },
+      {
+        path: 'admin/users',
+        canActivate: [adminGuard],
+        loadComponent: () =>
+          import('./features/admin/user-management/user-management.component').then(m => m.UserManagementComponent)
       }
     ]
   },

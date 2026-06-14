@@ -40,7 +40,8 @@ export class LayoutComponent implements OnInit, OnDestroy {
     { icon: 'library_books', label: 'Question Bank',   route: '/admin/questions', adminOnly: true },
     { icon: 'bar_chart',     label: 'Analytics',       route: '/admin/analytics', adminOnly: true },
     { icon: 'group',         label: 'SME Management',  route: '/admin/smes',      adminOnly: true },
-    { icon: 'layers',        label: 'Stack Management', route: '/admin/stacks',    adminOnly: true }
+    { icon: 'layers',        label: 'Stack Management', route: '/admin/stacks',    adminOnly: true },
+    { icon: 'admin_panel_settings', label: 'Super Admin', route: '/admin/users',  adminOnly: true }
   ];
 
   visibleItems = computed(() =>
