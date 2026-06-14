@@ -20,7 +20,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -119,11 +122,25 @@ public class UserAdminServiceImpl implements UserAdminService {
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
-    /** Replaces the user's stack assignments with the given stack ids (orphanRemoval clears the rest). */
+    /**
+     * Syncs the user's stack assignments to {@code stackIds} as a diff — removing only the
+     * mappings that are dropped and inserting only the genuinely new ones. (Clearing and
+     * re-adding all would make Hibernate insert duplicates before the orphan deletes flush,
+     * violating the (user_id, stack_id) unique constraint.)
+     */
     private void applyStacks(User user, List<Long> stackIds) {
-        user.getStackMappings().clear();
-        if (stackIds == null) return;
-        stackIds.stream().distinct().forEach(sid -> {
+        Set<Long> target = stackIds == null ? Set.of() : new HashSet<>(stackIds);
+
+        // Remove mappings no longer wanted (orphanRemoval deletes them).
+        user.getStackMappings().removeIf(m -> !target.contains(m.getStack().getId()));
+
+        // Stacks already mapped after removal.
+        Set<Long> existing = user.getStackMappings().stream()
+                .map(m -> m.getStack().getId())
+                .collect(Collectors.toSet());
+
+        // Insert only the stacks that aren't already mapped.
+        target.stream().filter(sid -> !existing.contains(sid)).forEach(sid -> {
             TechnologyStack stack = stackRepo.findById(sid)
                     .orElseThrow(() -> new ResourceNotFoundException("TechnologyStack", sid));
             user.getStackMappings().add(UserStackMapping.builder().user(user).stack(stack).build());
