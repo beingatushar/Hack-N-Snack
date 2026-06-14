@@ -5,10 +5,13 @@ import com.accenture.smartquiz.entity.enums.McqStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 @Entity
 @Table(name = "mcq_questions")
@@ -26,20 +29,13 @@ public class McqQuestion {
     @Column(name = "question_stem", nullable = false, columnDefinition = "TEXT")
     private String questionStem;
 
-    @Column(name = "option_a", nullable = false, length = 1000)
-    private String optionA;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "options", nullable = false, columnDefinition = "jsonb")
+    private List<String> options;
 
-    @Column(name = "option_b", nullable = false, length = 1000)
-    private String optionB;
-
-    @Column(name = "option_c", nullable = false, length = 1000)
-    private String optionC;
-
-    @Column(name = "option_d", nullable = false, length = 1000)
-    private String optionD;
-
-    @Column(name = "correct_option", nullable = false, length = 1)
-    private String correctOption;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "correct_option_indices", nullable = false, columnDefinition = "jsonb")
+    private List<Integer> correctOptionIndices;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)

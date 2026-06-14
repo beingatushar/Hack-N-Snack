@@ -2,11 +2,12 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { AnalyticsOverview, ApiResponse, ReviewerWorkload } from '../models';
+import { environment } from '../../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class AnalyticsService {
   private readonly http = inject(HttpClient);
-  private readonly base = '/api/analytics';
+  private readonly base = `${environment.apiUrl}/analytics`;
 
   getOverview(): Observable<AnalyticsOverview> {
     return this.http

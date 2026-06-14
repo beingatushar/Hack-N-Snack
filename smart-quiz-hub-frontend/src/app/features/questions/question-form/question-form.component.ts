@@ -1,13 +1,10 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
-import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
+import {
+  FormBuilder, Validators, ReactiveFormsModule,
+  FormArray, FormGroup, AbstractControl, ValidationErrors
+} from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatDividerModule } from '@angular/material/divider';
 import { McqService } from '../../../core/services/mcq.service';
 import { StackService } from '../../../core/services/stack.service';
 import { SnackService } from '../../../core/services/snack.service';
@@ -21,55 +18,90 @@ export interface QuestionFormData {
   question?: McqResponse;
 }
 
+function atLeastOneCorrect(arr: AbstractControl): ValidationErrors | null {
+  const fa = arr as FormArray;
+  return fa.controls.some(c => c.get('isCorrect')?.value === true)
+    ? null : { noCorrectOption: true };
+}
+
 @Component({
   selector: 'app-question-form',
   standalone: true,
-  imports: [
-    ReactiveFormsModule, MatDialogModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatDividerModule
-  ],
+  imports: [ReactiveFormsModule, MatDialogModule, MatProgressSpinnerModule],
   templateUrl: './question-form.component.html',
   styleUrl: './question-form.component.scss'
 })
 export class QuestionFormComponent implements OnInit {
-  private fb      = inject(FormBuilder);
-  private mcqSvc  = inject(McqService);
-  private stackSvc= inject(StackService);
-  private snack   = inject(SnackService);
-  private aiSvc   = inject(AiService);
-  dialogRef       = inject(MatDialogRef<QuestionFormComponent>);
-  data            = inject<QuestionFormData>(MAT_DIALOG_DATA);
+  private fb       = inject(FormBuilder);
+  private mcqSvc   = inject(McqService);
+  private stackSvc = inject(StackService);
+  private snack    = inject(SnackService);
+  private aiSvc    = inject(AiService);
+  dialogRef        = inject(MatDialogRef<QuestionFormComponent>);
+  data             = inject<QuestionFormData>(MAT_DIALOG_DATA);
 
-  stacks  = signal<StackSummary[]>([]);
-  topics  = signal<TopicResponse[]>([]);
-  loading = signal(false);
-  checking = signal(false);
+  stacks    = signal<StackSummary[]>([]);
+  topics    = signal<TopicResponse[]>([]);
+  loading   = signal(false);
+  checking  = signal(false);
   dupResult = signal<DuplicateCheckResponse | null>(null);
 
-  isEdit  = !!this.data.question;
+  isEdit = !!this.data.question;
   canSubmitForReview = !this.isEdit ||
     this.data.question?.status === 'DRAFT' ||
     this.data.question?.status === 'REJECTED';
 
+  readonly difficulties = [
+    { value: 'EASY',   label: 'Easy',   classes: 'border-emerald-300 text-emerald-700 bg-emerald-50', activeClasses: 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/30' },
+    { value: 'MEDIUM', label: 'Medium', classes: 'border-amber-300 text-amber-700 bg-amber-50',       activeClasses: 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/30' },
+    { value: 'HARD',   label: 'Hard',   classes: 'border-rose-300 text-rose-700 bg-rose-50',          activeClasses: 'bg-rose-500 border-rose-500 text-white shadow-lg shadow-rose-500/30' },
+  ];
+
   form = this.fb.group({
+    stackId:      [this.data.question?.stackId   ?? null as number | null, [Validators.required]],
+    topicId:      [this.data.question?.topicId   ?? null as number | null, [Validators.required]],
+    difficulty:   [this.data.question?.difficulty ?? '',                   [Validators.required]],
     questionStem: [this.data.question?.questionStem ?? '', [Validators.required, Validators.minLength(20)]],
-    optionA:      [this.data.question?.optionA ?? '', [Validators.required]],
-    optionB:      [this.data.question?.optionB ?? '', [Validators.required]],
-    optionC:      [this.data.question?.optionC ?? '', [Validators.required]],
-    optionD:      [this.data.question?.optionD ?? '', [Validators.required]],
-    correctOption:[this.data.question?.correctOption ?? '', [Validators.required]],
-    difficulty:   [this.data.question?.difficulty ?? '', [Validators.required]],
-    stackId:      [this.data.question?.stackId ?? null as number | null, [Validators.required]],
-    topicId:      [this.data.question?.topicId ?? null as number | null, [Validators.required]]
+    options: this.fb.array(this.buildInitialOptionRows(), [atLeastOneCorrect])
   });
+
+  get optionsArray(): FormArray { return this.form.get('options') as FormArray; }
+
+  get step1Complete(): boolean {
+    const v = this.form.value;
+    return !!(v.stackId && v.topicId && v.difficulty);
+  }
+
+  /** True when every existing option row has non-blank text — show "Add option" button. */
+  get allOptionsFilled(): boolean {
+    return this.optionsArray.controls.every(c => c.get('text')?.value?.trim());
+  }
+
+  get canCheck(): boolean {
+    const filledOpts = this.optionsArray.controls.filter(c => c.get('text')?.value?.trim());
+    const v = this.form.value;
+    return !!(v.stackId && v.topicId && v.questionStem && filledOpts.length >= 4);
+  }
+
+  private buildInitialOptionRows(): FormGroup[] {
+    const q = this.data.question;
+    if (q?.options?.length) {
+      return q.options.map((text, idx) =>
+        this.fb.group({
+          text:      [text, [Validators.required]],
+          isCorrect: [q.correctOptionIndices?.includes(idx) ?? false]
+        })
+      );
+    }
+    return Array.from({ length: 4 }, () =>
+      this.fb.group({ text: ['', [Validators.required]], isCorrect: [false] })
+    );
+  }
 
   ngOnInit(): void {
     this.stackSvc.getStacks().subscribe(res => {
       this.stacks.set(res.data);
-      if (this.data.question?.stackId) {
-        this.loadTopics(this.data.question.stackId);
-      }
+      if (this.data.question?.stackId) this.loadTopics(this.data.question.stackId);
     });
   }
 
@@ -83,46 +115,59 @@ export class QuestionFormComponent implements OnInit {
     this.stackSvc.getTopics(stackId).subscribe(res => this.topics.set(res.data));
   }
 
-  /** All fields needed to compare against the bank are present. */
-  get canCheck(): boolean {
-    const v = this.form.value;
-    return !!(v.stackId && v.topicId && v.questionStem &&
-      v.optionA && v.optionB && v.optionC && v.optionD);
+  setDifficulty(value: string): void {
+    this.form.patchValue({ difficulty: value });
+    this.form.get('difficulty')!.markAsTouched();
+  }
+
+  /** Click anywhere on the option card (not the input/delete) to toggle correct. */
+  toggleCorrect(index: number): void {
+    const ctrl = this.optionsArray.at(index);
+    ctrl.patchValue({ isCorrect: !ctrl.get('isCorrect')!.value });
+  }
+
+  addOption(): void {
+    this.optionsArray.push(
+      this.fb.group({ text: ['', [Validators.required]], isCorrect: [false] })
+    );
+  }
+
+  removeOption(index: number): void {
+    if (this.optionsArray.length <= 4) {
+      this.snack.error('A minimum of 4 options is required');
+      return;
+    }
+    this.optionsArray.removeAt(index);
+  }
+
+  optionLabel(i: number): string { return String.fromCharCode(65 + i); }
+
+  isCorrect(i: number): boolean {
+    return !!this.optionsArray.at(i).get('isCorrect')?.value;
   }
 
   private buildDupRequest(): DuplicateCheckRequest {
     const v = this.form.value;
     return {
-      stackId: v.stackId as number,
-      topicId: v.topicId as number,
+      stackId:      v.stackId as number,
+      topicId:      v.topicId as number,
       questionStem: v.questionStem ?? '',
-      optionA: v.optionA ?? '',
-      optionB: v.optionB ?? '',
-      optionC: v.optionC ?? '',
-      optionD: v.optionD ?? '',
-      excludeId: this.isEdit ? this.data.question!.id : null
+      options:      this.optionsArray.controls.map(c => c.get('text')?.value ?? ''),
+      excludeId:    this.isEdit ? this.data.question!.id : null
     };
   }
 
-  /** Manual "Duplicate Check" button. */
   runDuplicateCheck(): void {
-    if (this.checking()) return;
-    if (!this.canCheck) {
-      this.snack.error('Fill in stack, topic, question and all four options first');
-      return;
-    }
+    if (this.checking() || !this.canCheck) return;
     this.checking.set(true);
     this.dupResult.set(null);
-
     this.aiSvc.duplicateCheck(this.buildDupRequest()).subscribe({
       next: res => {
         this.dupResult.set(res.data);
         this.checking.set(false);
-        if (res.data.duplicate) {
-          this.snack.error(`Possible duplicate — ${res.data.maxSimilarityPercent}% similar`);
-        } else {
-          this.snack.success(`No duplicates found (max ${res.data.maxSimilarityPercent}%)`);
-        }
+        res.data.duplicate
+          ? this.snack.error(`Possible duplicate — ${res.data.maxSimilarityPercent}% similar`)
+          : this.snack.success(`No duplicates found (max ${res.data.maxSimilarityPercent}%)`);
       },
       error: err => {
         this.checking.set(false);
@@ -133,13 +178,7 @@ export class QuestionFormComponent implements OnInit {
 
   save(submitAfter = false): void {
     if (this.form.invalid || this.loading() || this.checking()) return;
-
-    // Drafts/updates are always allowed; only "Send for Review" enforces the
-    // similarity threshold (mirrors the server-side rule).
-    if (!submitAfter) {
-      this.persist(false);
-      return;
-    }
+    if (!submitAfter) { this.persist(false); return; }
 
     this.loading.set(true);
     this.aiSvc.duplicateCheck(this.buildDupRequest()).subscribe({
@@ -147,21 +186,32 @@ export class QuestionFormComponent implements OnInit {
         this.dupResult.set(res.data);
         if (res.data.duplicate) {
           this.loading.set(false);
-          this.snack.error(
-            `Too similar (${res.data.maxSimilarityPercent}%, threshold ${res.data.thresholdPercent}%). ` +
-            `Revise the question before sending for review.`);
+          this.snack.error(`Too similar (${res.data.maxSimilarityPercent}%). Revise before sending for review.`);
           return;
         }
         this.persist(true);
       },
-      // If the check itself errors, let the backend make the final call on submit.
       error: () => this.persist(true)
     });
   }
 
+  private buildRequest(): McqRequest {
+    const v = this.form.value;
+    return {
+      questionStem:        v.questionStem as string,
+      options:             this.optionsArray.controls.map(c => c.get('text')?.value as string),
+      correctOptionIndices: this.optionsArray.controls
+                             .map((c, i) => c.get('isCorrect')?.value ? i : -1)
+                             .filter(i => i >= 0),
+      difficulty:  v.difficulty as any,
+      stackId:     v.stackId as number,
+      topicId:     v.topicId as number
+    };
+  }
+
   private persist(submitAfter: boolean): void {
     this.loading.set(true);
-    const req = this.form.value as McqRequest;
+    const req = this.buildRequest();
     const obs = this.isEdit
       ? this.mcqSvc.updateQuestion(this.data.question!.id, req)
       : this.mcqSvc.createQuestion(req);
@@ -170,10 +220,7 @@ export class QuestionFormComponent implements OnInit {
       next: res => {
         if (submitAfter) {
           this.mcqSvc.submitForReview(res.data.id).subscribe({
-            next: () => {
-              this.snack.success('Question submitted for review');
-              this.dialogRef.close(res.data);
-            },
+            next: () => { this.snack.success('Question submitted for review'); this.dialogRef.close(res.data); },
             error: err => {
               this.loading.set(false);
               this.applyDuplicateError(err);
@@ -185,23 +232,15 @@ export class QuestionFormComponent implements OnInit {
           this.dialogRef.close(res.data);
         }
       },
-      error: err => {
-        this.snack.error(err.error?.message ?? 'Save failed');
-        this.loading.set(false);
-      }
+      error: err => { this.snack.error(err.error?.message ?? 'Save failed'); this.loading.set(false); }
     });
   }
 
-  /** Render the similar-question detail when the server blocks a submit (409). */
   private applyDuplicateError(err: any): void {
     const data = err?.error?.data;
     if (err?.status === 409 && data && Array.isArray(data.similar)) {
-      this.dupResult.set({
-        duplicate: true,
-        maxSimilarityPercent: data.maxSimilarityPercent,
-        thresholdPercent: data.thresholdPercent,
-        similar: data.similar
-      });
+      this.dupResult.set({ duplicate: true, maxSimilarityPercent: data.maxSimilarityPercent,
+        thresholdPercent: data.thresholdPercent, similar: data.similar });
     }
   }
 }

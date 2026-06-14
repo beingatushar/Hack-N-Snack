@@ -1,11 +1,10 @@
 package com.accenture.smartquiz.dto.request;
 
 import com.accenture.smartquiz.entity.enums.Difficulty;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.Data;
+
+import java.util.List;
 
 @Data
 public class McqRequest {
@@ -14,25 +13,13 @@ public class McqRequest {
     @Size(min = 20, max = 2000, message = "Question must be between 20 and 2000 characters")
     private String questionStem;
 
-    @NotBlank(message = "Option A is required")
-    @Size(max = 1000)
-    private String optionA;
+    @NotNull(message = "Options list is required")
+    @Size(min = 4, message = "At least 4 options are required")
+    private List<@NotBlank(message = "Option text must not be blank") @Size(max = 1000) String> options;
 
-    @NotBlank(message = "Option B is required")
-    @Size(max = 1000)
-    private String optionB;
-
-    @NotBlank(message = "Option C is required")
-    @Size(max = 1000)
-    private String optionC;
-
-    @NotBlank(message = "Option D is required")
-    @Size(max = 1000)
-    private String optionD;
-
-    @NotBlank(message = "Correct option is required")
-    @Pattern(regexp = "^[ABCDabcd]$", message = "Correct option must be A, B, C, or D")
-    private String correctOption;
+    @NotNull(message = "Correct option indices are required")
+    @Size(min = 1, message = "At least one correct option must be selected")
+    private List<@NotNull @Min(0) Integer> correctOptionIndices;
 
     @NotNull(message = "Difficulty is required")
     private Difficulty difficulty;
@@ -42,4 +29,10 @@ public class McqRequest {
 
     @NotNull(message = "Topic ID is required")
     private Long topicId;
+
+    @AssertTrue(message = "Correct option indices must be within the range of provided options")
+    public boolean isCorrectIndicesValid() {
+        if (options == null || correctOptionIndices == null) return true;
+        return correctOptionIndices.stream().allMatch(i -> i != null && i >= 0 && i < options.size());
+    }
 }

@@ -166,7 +166,7 @@ export class QuestionBankComponent implements OnInit {
 
   openEdit(q: McqResponse): void {
     const ref = this.dialog.open(QuestionFormComponent, {
-      data: { question: q }, maxWidth: '720px', width: '100%'
+      data: { question: q }, maxWidth: '780px', width: '100%'
     });
     ref.afterClosed().subscribe(result => { if (result) this.load(); });
   }

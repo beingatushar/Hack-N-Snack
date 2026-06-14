@@ -2,11 +2,12 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { ApiResponse, AppNotification, PagedResponse } from '../models';
+import { environment } from '../../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class NotificationService {
   private readonly http = inject(HttpClient);
-  private readonly base = '/api/notifications';
+  private readonly base = `${environment.apiUrl}/notifications`;
 
   getNotifications(page = 0, size = 20): Observable<PagedResponse<AppNotification>> {
     return this.http

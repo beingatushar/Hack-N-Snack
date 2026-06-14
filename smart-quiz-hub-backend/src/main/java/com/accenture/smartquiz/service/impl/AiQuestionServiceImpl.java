@@ -166,8 +166,7 @@ public class AiQuestionServiceImpl implements AiQuestionService {
     private double screen(McqQuestion candidate) {
         SimilarityOutcome outcome = similarityService.analyze(
                 candidate.getStack().getId(), candidate.getTopic().getId(),
-                candidate.getQuestionStem(), candidate.getOptionA(), candidate.getOptionB(),
-                candidate.getOptionC(), candidate.getOptionD(), null);
+                candidate.getQuestionStem(), candidate.getOptions(), null);
         return outcome.maxScore();
     }
 
@@ -185,10 +184,13 @@ public class AiQuestionServiceImpl implements AiQuestionService {
             return null;
         }
 
+        // Map A/B/C/D letter to 0-based index
+        int correctIndex = correct.charAt(0) - 'A';
+
         return McqQuestion.builder()
                 .questionStem(stem)
-                .optionA(a).optionB(b).optionC(c).optionD(d)
-                .correctOption(correct)
+                .options(List.of(a, b, c, d))
+                .correctOptionIndices(List.of(correctIndex))
                 .difficulty(difficulty)
                 .stack(stack)
                 .topic(topic)
@@ -402,7 +404,7 @@ public class AiQuestionServiceImpl implements AiQuestionService {
                 "optionB", b,
                 "optionC", c,
                 "optionD", d,
-                "correctOption", correct
+                "correctOption", correct  // A/B/C/D — toCandidate maps this to an index
         );
     }
 

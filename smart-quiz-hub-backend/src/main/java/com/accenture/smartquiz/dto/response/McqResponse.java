@@ -7,6 +7,7 @@ import lombok.Getter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 @Getter
 @Builder
@@ -14,11 +15,8 @@ public class McqResponse {
 
     private Long id;
     private String questionStem;
-    private String optionA;
-    private String optionB;
-    private String optionC;
-    private String optionD;
-    private String correctOption;
+    private List<String> options;
+    private List<Integer> correctOptionIndices;
     private Difficulty difficulty;
     private Long stackId;
     private String stackName;

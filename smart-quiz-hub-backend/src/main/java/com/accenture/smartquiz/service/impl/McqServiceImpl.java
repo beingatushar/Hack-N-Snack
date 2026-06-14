@@ -43,7 +43,9 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -67,11 +69,8 @@ public class McqServiceImpl implements McqService {
 
         McqQuestion question = McqQuestion.builder()
                 .questionStem(req.getQuestionStem())
-                .optionA(req.getOptionA())
-                .optionB(req.getOptionB())
-                .optionC(req.getOptionC())
-                .optionD(req.getOptionD())
-                .correctOption(req.getCorrectOption().toUpperCase())
+                .options(req.getOptions())
+                .correctOptionIndices(req.getCorrectOptionIndices())
                 .difficulty(req.getDifficulty())
                 .stack(stack)
                 .topic(topic)
@@ -94,11 +93,8 @@ public class McqServiceImpl implements McqService {
                 .orElseThrow(() -> new ResourceNotFoundException("Topic", req.getTopicId()));
 
         question.setQuestionStem(req.getQuestionStem());
-        question.setOptionA(req.getOptionA());
-        question.setOptionB(req.getOptionB());
-        question.setOptionC(req.getOptionC());
-        question.setOptionD(req.getOptionD());
-        question.setCorrectOption(req.getCorrectOption().toUpperCase());
+        question.setOptions(req.getOptions());
+        question.setCorrectOptionIndices(req.getCorrectOptionIndices());
         question.setDifficulty(req.getDifficulty());
         question.setStack(stack);
         question.setTopic(topic);
@@ -161,8 +157,7 @@ public class McqServiceImpl implements McqService {
     private void enforceNotDuplicate(McqQuestion question) {
         SimilarityOutcome outcome = similarityService.analyze(
                 question.getStack().getId(), question.getTopic().getId(),
-                question.getQuestionStem(), question.getOptionA(), question.getOptionB(),
-                question.getOptionC(), question.getOptionD(), question.getId());
+                question.getQuestionStem(), question.getOptions(), question.getId());
 
         double threshold = similarityService.threshold();
         question.setAiSimilarityScore(
@@ -284,8 +279,7 @@ public class McqServiceImpl implements McqService {
     public DuplicateCheckResponse checkDuplicate(DuplicateCheckRequest req) {
         SimilarityOutcome outcome = similarityService.analyze(
                 req.getStackId(), req.getTopicId(),
-                req.getQuestionStem(), req.getOptionA(), req.getOptionB(),
-                req.getOptionC(), req.getOptionD(), req.getExcludeId());
+                req.getQuestionStem(), req.getOptions(), req.getExcludeId());
 
         double threshold = similarityService.threshold();
         boolean duplicate = outcome.maxScore() >= threshold;
@@ -302,21 +296,50 @@ public class McqServiceImpl implements McqService {
                 .build();
     }
 
+    /**
+     * Parses a bulk-upload XLSX row.
+     *
+     * Expected column layout:
+     *   0  – Question Stem
+     *   1  – Options (pipe-separated, at least 4: "Opt1|Opt2|Opt3|Opt4")
+     *   2  – Correct option indices (comma-separated, 0-based: "1" or "0,2")
+     *   3  – Difficulty (EASY / MEDIUM / HARD)
+     *   4  – Stack Name
+     *   5  – Topic Name
+     */
     private McqQuestion parseRow(Row row, SmartQuizUserDetails currentUser) {
-        String questionStem = getCellString(row, 0);
-        String optionA = getCellString(row, 1);
-        String optionB = getCellString(row, 2);
-        String optionC = getCellString(row, 3);
-        String optionD = getCellString(row, 4);
-        String correctOption = getCellString(row, 5).toUpperCase();
-        String difficultyStr = getCellString(row, 6).toUpperCase();
-        String stackName = getCellString(row, 7);
-        String topicName = getCellString(row, 8);
+        String questionStem      = getCellString(row, 0);
+        String optionsPiped      = getCellString(row, 1);
+        String correctIdxStr     = getCellString(row, 2);
+        String difficultyStr     = getCellString(row, 3).toUpperCase();
+        String stackName         = getCellString(row, 4);
+        String topicName         = getCellString(row, 5);
 
         if (questionStem.isBlank()) throw new IllegalArgumentException("Question stem is empty");
         if (mcqRepo.existsByQuestionStemIgnoreCase(questionStem))
             throw new IllegalArgumentException("Duplicate question — already exists in the question bank");
-        if (!correctOption.matches("[ABCD]")) throw new IllegalArgumentException("Correct option must be A/B/C/D");
+
+        List<String> options = Arrays.stream(optionsPiped.split("\\|"))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .collect(Collectors.toList());
+        if (options.size() < 4)
+            throw new IllegalArgumentException("At least 4 options required (pipe-separated in column 2)");
+
+        List<Integer> correctIndices;
+        try {
+            correctIndices = Arrays.stream(correctIdxStr.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .map(Integer::parseInt)
+                    .collect(Collectors.toList());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Correct option indices must be comma-separated integers (0-based)");
+        }
+        if (correctIndices.isEmpty())
+            throw new IllegalArgumentException("At least one correct option index is required");
+        if (correctIndices.stream().anyMatch(i -> i < 0 || i >= options.size()))
+            throw new IllegalArgumentException("Correct option indices out of range (must be 0 to " + (options.size() - 1) + ")");
 
         Difficulty difficulty;
         try {
@@ -335,11 +358,8 @@ public class McqServiceImpl implements McqService {
 
         return McqQuestion.builder()
                 .questionStem(questionStem)
-                .optionA(optionA)
-                .optionB(optionB)
-                .optionC(optionC)
-                .optionD(optionD)
-                .correctOption(correctOption)
+                .options(options)
+                .correctOptionIndices(correctIndices)
                 .difficulty(difficulty)
                 .stack(stack)
                 .topic(topic)
@@ -418,10 +438,15 @@ public class McqServiceImpl implements McqService {
         List<McqQuestion> questions = mcqRepo.findForExport(
                 status == null ? McqStatus.APPROVED : status, stackId, topicId, difficulty);
 
+        // Determine the maximum number of options across all questions (at least 4)
+        int maxOptions = questions.stream()
+                .mapToInt(q -> q.getOptions() == null ? 0 : q.getOptions().size())
+                .max().orElse(4);
+        maxOptions = Math.max(maxOptions, 4);
+
         try (Workbook wb = new XSSFWorkbook()) {
             Sheet sheet = wb.createSheet("Questions");
 
-            // Header row
             CellStyle headerStyle = wb.createCellStyle();
             Font font = wb.createFont();
             font.setBold(true);
@@ -429,17 +454,19 @@ public class McqServiceImpl implements McqService {
             headerStyle.setFillForegroundColor(IndexedColors.CORNFLOWER_BLUE.getIndex());
             headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 
-            String[] headers = {"ID", "Stack", "Topic", "Difficulty", "Status",
-                    "Question", "Option A", "Option B", "Option C", "Option D",
-                    "Correct", "Creator", "Reviewer", "AI Score"};
+            // Build dynamic headers
+            List<String> headers = new ArrayList<>(
+                    List.of("ID", "Stack", "Topic", "Difficulty", "Status", "Question"));
+            for (int i = 1; i <= maxOptions; i++) headers.add("Option " + i);
+            headers.addAll(List.of("Correct Options (1-based)", "Creator", "Reviewer", "AI Score"));
+
             Row headerRow = sheet.createRow(0);
-            for (int i = 0; i < headers.length; i++) {
+            for (int i = 0; i < headers.size(); i++) {
                 Cell cell = headerRow.createCell(i);
-                cell.setCellValue(headers[i]);
+                cell.setCellValue(headers.get(i));
                 cell.setCellStyle(headerStyle);
             }
 
-            // Data rows
             int rowIdx = 1;
             for (McqQuestion q : questions) {
                 Row row = sheet.createRow(rowIdx++);
@@ -449,19 +476,26 @@ public class McqServiceImpl implements McqService {
                 row.createCell(3).setCellValue(q.getDifficulty().name());
                 row.createCell(4).setCellValue(q.getStatus().name());
                 row.createCell(5).setCellValue(q.getQuestionStem());
-                row.createCell(6).setCellValue(q.getOptionA());
-                row.createCell(7).setCellValue(q.getOptionB());
-                row.createCell(8).setCellValue(q.getOptionC());
-                row.createCell(9).setCellValue(q.getOptionD());
-                row.createCell(10).setCellValue(q.getCorrectOption());
-                row.createCell(11).setCellValue(q.getCreator().getFullName());
-                row.createCell(12).setCellValue(q.getReviewer() != null ? q.getReviewer().getFullName() : "");
-                row.createCell(13).setCellValue(q.getAiSimilarityScore() != null
-                        ? q.getAiSimilarityScore().doubleValue() : 0.0);
+
+                List<String> opts = q.getOptions() != null ? q.getOptions() : List.of();
+                for (int i = 0; i < maxOptions; i++) {
+                    row.createCell(6 + i).setCellValue(i < opts.size() ? opts.get(i) : "");
+                }
+
+                int correctCol = 6 + maxOptions;
+                String correctLabel = q.getCorrectOptionIndices() == null ? "" :
+                        q.getCorrectOptionIndices().stream()
+                                .map(i -> String.valueOf(i + 1))
+                                .collect(Collectors.joining(", "));
+                row.createCell(correctCol).setCellValue(correctLabel);
+                row.createCell(correctCol + 1).setCellValue(q.getCreator().getFullName());
+                row.createCell(correctCol + 2).setCellValue(
+                        q.getReviewer() != null ? q.getReviewer().getFullName() : "");
+                row.createCell(correctCol + 3).setCellValue(
+                        q.getAiSimilarityScore() != null ? q.getAiSimilarityScore().doubleValue() : 0.0);
             }
 
-            // Auto-size first 14 columns
-            for (int i = 0; i < headers.length; i++) sheet.autoSizeColumn(i);
+            for (int i = 0; i < headers.size(); i++) sheet.autoSizeColumn(i);
 
             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
             wb.write(out);

@@ -51,17 +51,19 @@
 
             <!-- Options -->
             <div class="grid grid-cols-2 gap-3 mb-5">
-              @for (opt of [['A', q.optionA], ['B', q.optionB], ['C', q.optionC], ['D', q.optionD]]; track opt[0]) {
+              @for (opt of q.options; track $index; let i = $index) {
                 <div class="flex items-start gap-3 p-3.5 rounded-xl border transition-colors"
-                     [class]="opt[0] === q.correctOption
+                     [class]="q.correctOptionIndices?.includes(i)
                        ? 'bg-emerald-50 border-emerald-200'
                        : 'bg-slate-50 border-slate-200'">
                   <span class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 mt-px"
-                        [class]="opt[0] === q.correctOption
+                        [class]="q.correctOptionIndices?.includes(i)
                           ? 'bg-emerald-500 text-white'
-                          : 'bg-indigo-100 text-indigo-700'">{{ opt[0] }}</span>
-                  <span class="text-sm text-slate-700 leading-snug flex-1">{{ opt[1] }}</span>
-                  @if (opt[0] === q.correctOption) {
+                          : 'bg-indigo-100 text-indigo-700'">
+                    {{ optionLabel(i) }}
+                  </span>
+                  <span class="text-sm text-slate-700 leading-snug flex-1">{{ opt }}</span>
+                  @if (q.correctOptionIndices?.includes(i)) {
                     <span class="material-icons text-emerald-500 text-[18px] flex-shrink-0">check_circle</span>
                   }
                 </div>

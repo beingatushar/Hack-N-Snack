@@ -2,7 +2,10 @@ package com.accenture.smartquiz.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
+
+import java.util.List;
 
 /**
  * Payload for the AI-driven duplicate / similarity check performed on the
@@ -21,17 +24,9 @@ public class DuplicateCheckRequest {
     @NotBlank(message = "Question stem is required")
     private String questionStem;
 
-    @NotBlank(message = "Option A is required")
-    private String optionA;
-
-    @NotBlank(message = "Option B is required")
-    private String optionB;
-
-    @NotBlank(message = "Option C is required")
-    private String optionC;
-
-    @NotBlank(message = "Option D is required")
-    private String optionD;
+    @NotNull(message = "Options list is required")
+    @Size(min = 4, message = "At least 4 options are required")
+    private List<@NotBlank String> options;
 
     /** When editing an existing question, exclude it from the comparison. */
     private Long excludeId;

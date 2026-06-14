@@ -78,7 +78,7 @@ public class SimilarityServiceImpl implements SimilarityService {
     @Transactional(readOnly = true)
     public SimilarityOutcome analyze(Long stackId, Long topicId,
                                      String questionStem,
-                                     String optionA, String optionB, String optionC, String optionD,
+                                     List<String> options,
                                      Long excludeId) {
 
         List<McqQuestion> existing = mcqRepo.findByStackIdAndTopicId(stackId, topicId).stream()
@@ -89,10 +89,9 @@ public class SimilarityServiceImpl implements SimilarityService {
             return SimilarityOutcome.empty();
         }
 
-        String candidate = combine(questionStem, optionA, optionB, optionC, optionD);
+        String candidate = combine(questionStem, options);
         List<String> existingTexts = existing.stream()
-                .map(q -> combine(q.getQuestionStem(), q.getOptionA(), q.getOptionB(),
-                        q.getOptionC(), q.getOptionD()))
+                .map(q -> combine(q.getQuestionStem(), q.getOptions()))
                 .toList();
 
         // The topic and stack names are constant across every question in this
@@ -281,9 +280,14 @@ public class SimilarityServiceImpl implements SimilarityService {
         return dot / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 
-    private static String combine(String stem, String a, String b, String c, String d) {
-        return String.join(" ",
-                safe(stem), safe(a), safe(b), safe(c), safe(d));
+    private static String combine(String stem, List<String> options) {
+        StringBuilder sb = new StringBuilder(safe(stem));
+        if (options != null) {
+            for (String opt : options) {
+                sb.append(' ').append(safe(opt));
+            }
+        }
+        return sb.toString();
     }
 
     private static String safe(String s) {

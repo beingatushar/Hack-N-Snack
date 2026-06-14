@@ -62,6 +62,10 @@ export class PendingReviewsComponent implements OnInit {
     this.load();
   }
 
+  optionLabel(index: number): string {
+    return String.fromCharCode(65 + index);
+  }
+
   approve(q: McqResponse): void {
     this.reviewSvc.submitReview(q.id, { decision: 'APPROVED' }).subscribe({
       next: () => { this.snack.success('Question approved'); this.load(); },

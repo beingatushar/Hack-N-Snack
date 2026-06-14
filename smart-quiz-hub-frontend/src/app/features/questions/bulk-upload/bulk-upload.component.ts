@@ -76,15 +76,42 @@ export class BulkUploadComponent {
   }
 
   downloadTemplate(): void {
-    const cols = ['Question Stem', 'Option A', 'Option B', 'Option C', 'Option D', 'Correct Option (A/B/C/D)', 'Difficulty (EASY/MEDIUM/HARD)', 'Stack Name', 'Topic Name'];
+    // Column layout matches the server-side parseRow() method:
+    //   0 Question Stem | 1 Options (pipe-separated, ≥4) | 2 Correct Indices (0-based, comma-sep)
+    //   3 Difficulty | 4 Stack Name | 5 Topic Name
+    const cols = [
+      'Question Stem',
+      'Options (pipe-separated, min 4: Opt1|Opt2|Opt3|Opt4)',
+      'Correct Indices (0-based, comma-sep: "1" or "0,2")',
+      'Difficulty (EASY/MEDIUM/HARD)',
+      'Stack Name',
+      'Topic Name'
+    ];
     const sample = [
       'Which component is used for service discovery in Spring Cloud?',
-      'Spring MVC', 'Eureka Server', 'Hibernate', 'Apache Tomcat',
-      'B', 'MEDIUM', 'Spring Cloud', 'Introduction to Spring Cloud'
+      'Spring MVC|Eureka Server|Hibernate|Apache Tomcat',
+      '1',
+      'MEDIUM',
+      'Spring Cloud',
+      'Introduction to Spring Cloud'
     ];
-    const th = cols.map(c => `<th>${c}</th>`).join('');
-    const td = sample.map(v => `<td>${v}</td>`).join('');
-    const html = `<html><head><meta charset="utf-8"></head><body><table><tr>${th}</tr><tr>${td}</tr></table></body></html>`;
+    const sampleMulti = [
+      'Which of the following are valid HTTP methods? (select all that apply)',
+      'GET|POST|FETCH|DELETE|INVOKE',
+      '0,1,3',
+      'EASY',
+      'Spring Cloud',
+      'Introduction to Spring Cloud'
+    ];
+    const th = cols.map(c => `<th style="background:#4f46e5;color:#fff;padding:6px 10px">${c}</th>`).join('');
+    const td = sample.map(v => `<td style="padding:4px 10px">${v}</td>`).join('');
+    const td2 = sampleMulti.map(v => `<td style="padding:4px 10px">${v}</td>`).join('');
+    const html = `<html><head><meta charset="utf-8"></head><body>
+      <table border="1" cellspacing="0">
+        <tr>${th}</tr>
+        <tr>${td}</tr>
+        <tr>${td2}</tr>
+      </table></body></html>`;
     const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

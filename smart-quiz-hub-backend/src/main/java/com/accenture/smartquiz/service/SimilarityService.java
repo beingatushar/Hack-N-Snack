@@ -14,12 +14,13 @@ public interface SimilarityService {
      * Compare a candidate MCQ against every existing question in the same
      * technology stack <em>and</em> topic.
      *
+     * @param options   all answer option texts for the candidate question
      * @param excludeId optional id to exclude (the question being edited); may be {@code null}
      * @return the similarity outcome (max score + per-question matches, 0.0–1.0)
      */
     SimilarityOutcome analyze(Long stackId, Long topicId,
                               String questionStem,
-                              String optionA, String optionB, String optionC, String optionD,
+                              java.util.List<String> options,
                               Long excludeId);
 
     /** The configured duplicate threshold in the range 0.0–1.0 (default 0.30). */

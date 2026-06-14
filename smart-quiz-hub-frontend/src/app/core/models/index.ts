@@ -49,11 +49,8 @@ export interface TopicResponse {
 export interface McqResponse {
   id: number;
   questionStem: string;
-  optionA: string;
-  optionB: string;
-  optionC: string;
-  optionD: string;
-  correctOption: string;
+  options: string[];
+  correctOptionIndices: number[];
   difficulty: Difficulty;
   stackId: number;
   stackName: string;
@@ -72,11 +69,8 @@ export interface McqResponse {
 
 export interface McqRequest {
   questionStem: string;
-  optionA: string;
-  optionB: string;
-  optionC: string;
-  optionD: string;
-  correctOption: string;
+  options: string[];
+  correctOptionIndices: number[];
   difficulty: Difficulty;
   stackId: number;
   topicId: number;
@@ -165,10 +159,7 @@ export interface DuplicateCheckRequest {
   stackId: number;
   topicId: number;
   questionStem: string;
-  optionA: string;
-  optionB: string;
-  optionC: string;
-  optionD: string;
+  options: string[];
   excludeId?: number | null;
 }
 
