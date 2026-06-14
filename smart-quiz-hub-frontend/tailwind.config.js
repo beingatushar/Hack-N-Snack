@@ -35,6 +35,27 @@ module.exports = {
         'card-hover': '0 6px 24px rgba(99,102,241,0.12)',
         dialog: '0 25px 60px rgba(0,0,0,0.18)',
       },
+      keyframes: {
+        fadeUp: {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-18px)' },
+        },
+        blob: {
+          '0%': { transform: 'translate(0,0) scale(1)' },
+          '33%': { transform: 'translate(30px,-50px) scale(1.1)' },
+          '66%': { transform: 'translate(-20px,20px) scale(0.9)' },
+          '100%': { transform: 'translate(0,0) scale(1)' },
+        },
+      },
+      animation: {
+        'fade-up': 'fadeUp 0.4s ease-out both',
+        float: 'float 6s ease-in-out infinite',
+        blob: 'blob 8s infinite',
+      },
     },
   },
   plugins: [],

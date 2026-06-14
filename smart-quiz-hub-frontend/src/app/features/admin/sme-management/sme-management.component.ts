@@ -9,6 +9,7 @@ import { forkJoin } from 'rxjs';
 import { AdminService } from '../../../core/services/admin.service';
 import { AnalyticsService } from '../../../core/services/analytics.service';
 import { SmeReport, SmeUserResponse } from '../../../core/models';
+import { ButtonDirective } from '../../../shared/components/button/button.directive';
 
 /** Combines the SME roster (email, stacks) with their performance report (Story 2.1). */
 export interface SmeReportRow {
@@ -21,10 +22,9 @@ export interface SmeReportRow {
   standalone: true,
   imports: [
     MatCardModule, MatIconModule, MatChipsModule,
-    MatProgressSpinnerModule, MatButtonModule, MatTooltipModule
+    MatProgressSpinnerModule, MatButtonModule, MatTooltipModule, ButtonDirective
   ],
   templateUrl: './sme-management.component.html',
-  styleUrl: './sme-management.component.scss'
 })
 export class SmeManagementComponent implements OnInit {
   private adminSvc = inject(AdminService);

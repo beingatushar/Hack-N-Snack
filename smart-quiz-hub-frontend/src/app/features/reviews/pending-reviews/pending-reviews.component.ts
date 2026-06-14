@@ -1,66 +1,137 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
-import { MatCardModule } from '@angular/material/card';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatDialogModule, MatDialog } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatExpansionModule } from '@angular/material/expansion';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatDialog } from '@angular/material/dialog';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, NgClass } from '@angular/common';
 import { ReviewService } from '../../../core/services/review.service';
 import { SnackService } from '../../../core/services/snack.service';
 import { McqResponse } from '../../../core/models';
 import { RelativeTimePipe } from '../../../shared/pipes/relative-time.pipe';
+import { ColumnFilterComponent } from '../../../shared/components/column-filter/column-filter.component';
+import { ButtonDirective } from '../../../shared/components/button/button.directive';
+import { QuestionDetailDialogComponent } from '../../questions/question-detail/question-detail-dialog.component';
+import { applyFilters, applySort, distinctOptions, SortState } from '../../../shared/utils/table-ops';
+import { mcqColumnValue, DIFFICULTY_FILTER_OPTIONS } from '../../../shared/utils/mcq-columns';
+import { statusBadgeClass, difficultyBadgeClass } from '../../../shared/utils/badge';
+
+type ReviewTab = 'pending' | 'reviewed';
 
 @Component({
   selector: 'app-pending-reviews',
   standalone: true,
   imports: [
-    MatCardModule, MatButtonModule, MatIconModule, MatDialogModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatPaginatorModule, MatProgressSpinnerModule,
-    MatExpansionModule, MatTooltipModule,
-    FormsModule, NgClass, DatePipe, RelativeTimePipe
+    MatButtonModule, MatIconModule, MatMenuModule, MatTooltipModule,
+    FormsModule, NgClass, DatePipe, RelativeTimePipe, ColumnFilterComponent, ButtonDirective
   ],
   templateUrl: './pending-reviews.component.html',
-  styleUrl: './pending-reviews.component.scss'
 })
 export class PendingReviewsComponent implements OnInit {
   private reviewSvc = inject(ReviewService);
   private snack     = inject(SnackService);
+  private dialog    = inject(MatDialog);
+  private router    = inject(Router);
+  private route     = inject(ActivatedRoute);
 
-  questions     = signal<McqResponse[]>([]);
-  loading       = signal(true);
-  totalElements = signal(0);
-  page          = signal(0);
+  tab      = signal<ReviewTab>('pending');
+  allRows  = signal<McqResponse[]>([]);
+  loading  = signal(true);
+  page     = signal(0);
+  pageSize = signal(8);
 
-  activeReview  = signal<number | null>(null);
+  sort    = signal<SortState>({ key: 'updated', dir: 'desc' });
+  filters = signal<Record<string, string | null>>({ stack: null, difficulty: null });
+
   reviewComments: Record<number, string> = {};
 
+  readonly difficultyOptions = DIFFICULTY_FILTER_OPTIONS;
+  readonly statusBadge = statusBadgeClass;
+  readonly diffBadge = difficultyBadgeClass;
+  readonly sortFields = [
+    { key: 'updated', label: 'Updated' },
+    { key: 'difficulty', label: 'Difficulty' },
+    { key: 'stack', label: 'Stack' },
+  ];
+
+  stackOptions = computed(() => distinctOptions(this.allRows(), mcqColumnValue, 'stack'));
+  sortLabel = computed(() => this.sortFields.find(f => f.key === this.sort().key)?.label ?? 'Updated');
+
+  private filtered = computed(() => applyFilters(this.allRows(), this.filters(), mcqColumnValue));
+  private sorted   = computed(() => applySort(this.filtered(), this.sort(), mcqColumnValue));
+  totalElements = computed(() => this.filtered().length);
+  totalPages    = computed(() => Math.max(1, Math.ceil(this.totalElements() / this.pageSize())));
+  questions = computed(() => {
+    const start = this.page() * this.pageSize();
+    return this.sorted().slice(start, start + this.pageSize());
+  });
+  activeFilterCount = computed(() => Object.values(this.filters()).filter(v => v != null).length);
+
   ngOnInit(): void {
+    const qp = this.route.snapshot.queryParamMap;
+    if (qp.get('tab') === 'reviewed') this.tab.set('reviewed');
+    const sortKey = qp.get('sort');
+    if (sortKey) this.sort.set({ key: sortKey, dir: qp.get('dir') === 'asc' ? 'asc' : 'desc' });
+    this.filters.update(f => ({ ...f, stack: qp.get('stack'), difficulty: qp.get('difficulty') }));
+    const page = Number(qp.get('page'));
+    if (page > 0) this.page.set(page);
     this.load();
   }
 
   load(): void {
     this.loading.set(true);
-    this.reviewSvc.getPendingReviews(this.page(), 10).subscribe({
-      next: res => {
-        this.questions.set(res.data.content);
-        this.totalElements.set(res.data.totalElements);
-        this.loading.set(false);
-      },
+    const obs = this.tab() === 'reviewed'
+      ? this.reviewSvc.getReviewedByMe(0, 1000)
+      : this.reviewSvc.getPendingReviews(0, 1000);
+    obs.subscribe({
+      next: res => { this.allRows.set(res.data.content); this.loading.set(false); },
       error: () => this.loading.set(false)
     });
   }
 
-  onPage(e: PageEvent): void {
-    this.page.set(e.pageIndex);
+  setTab(t: ReviewTab): void {
+    if (this.tab() === t) return;
+    this.tab.set(t);
+    this.page.set(0);
+    this.syncUrl();
     this.load();
+  }
+
+  setSortKey(key: string): void { this.sort.update(s => ({ key, dir: s.dir })); this.page.set(0); this.syncUrl(); }
+  toggleDir(): void { this.sort.update(s => ({ key: s.key, dir: s.dir === 'asc' ? 'desc' : 'asc' })); this.syncUrl(); }
+  setFilter(key: string, value: string | null): void {
+    this.filters.update(f => ({ ...f, [key]: value }));
+    this.page.set(0);
+    this.syncUrl();
+  }
+  clearFilters(): void { this.filters.set({ stack: null, difficulty: null }); this.page.set(0); this.syncUrl(); }
+
+  prevPage(): void { if (this.page() > 0) { this.page.update(p => p - 1); this.syncUrl(); } }
+  nextPage(): void { if (this.page() < this.totalPages() - 1) { this.page.update(p => p + 1); this.syncUrl(); } }
+
+  openView(q: McqResponse): void {
+    this.dialog.open(QuestionDetailDialogComponent, { data: { question: q }, maxWidth: '720px', width: '100%' });
+  }
+
+  private syncUrl(): void {
+    const f = this.filters();
+    const s = this.sort();
+    const isDefaultSort = s.key === 'updated' && s.dir === 'desc';
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        tab:  this.tab() === 'reviewed' ? 'reviewed' : null,
+        sort: isDefaultSort ? null : s.key,
+        dir:  isDefaultSort ? null : s.dir,
+        stack: f['stack'],
+        difficulty: f['difficulty'],
+        page: this.page() > 0 ? this.page() : null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   optionLabel(index: number): string {

@@ -227,6 +227,14 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     @Transactional(readOnly = true)
+    public PagedResponse<McqResponse> getReviewedByMe(SmartQuizUserDetails currentUser, Pageable pageable) {
+        var statuses = List.of(McqStatus.APPROVED, McqStatus.REJECTED, McqStatus.MODIFICATION_REQUESTED);
+        var page = mcqRepo.findByReviewerIdAndStatusIn(currentUser.getUserId(), statuses, pageable);
+        return PagedResponse.of(page.map(McqMapper::toResponse));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public PagedResponse<McqResponse> getReadyForReview(SmartQuizUserDetails currentUser, Pageable pageable) {
         if (currentUser.getRole() == UserRole.ADMIN) {
             return PagedResponse.of(mcqRepo.findByStatus(McqStatus.READY_FOR_REVIEW, pageable)

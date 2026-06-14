@@ -20,7 +20,6 @@ interface NavItem {
   standalone: true,
   imports: [RouterOutlet, RouterLink, RouterLinkActive, CommonModule],
   templateUrl: './layout.component.html',
-  styleUrl: './layout.component.scss'
 })
 export class LayoutComponent implements OnInit, OnDestroy {
   auth = inject(AuthService);

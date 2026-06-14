@@ -3,11 +3,12 @@ import { FormsModule } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { StackService } from '../../../core/services/stack.service';
 import { StackDetail, TopicDetail } from '../../../core/models';
+import { ButtonDirective } from '../../../shared/components/button/button.directive';
 
 @Component({
   selector: 'app-stack-management',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ButtonDirective],
   template: `
     <div class="animate-fade-up">
 
@@ -17,12 +18,48 @@ import { StackDetail, TopicDetail } from '../../../core/models';
           <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Stack & Topic Management</h1>
           <p class="text-slate-500 text-sm mt-1">Manage technology stacks and their topics</p>
         </div>
-        <button (click)="openStackForm()"
-                class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5 transition-all">
+        <button (click)="openStackForm()" appBtn="primary">
           <span class="material-icons text-[17px]">add</span>
           New Stack
         </button>
       </div>
+
+      <!-- Stats strip -->
+      @if (!loading() && stacks().length > 0) {
+        <div class="grid grid-cols-3 gap-3 mb-6">
+          <div class="bg-white border border-slate-200 rounded-2xl px-4 py-3.5 shadow-sm">
+            <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Stacks</p>
+            <p class="text-2xl font-extrabold text-slate-900 mt-0.5">{{ stacks().length }}</p>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-2xl px-4 py-3.5 shadow-sm">
+            <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active</p>
+            <p class="text-2xl font-extrabold text-emerald-600 mt-0.5">{{ activeStacks() }}</p>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-2xl px-4 py-3.5 shadow-sm">
+            <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Topics</p>
+            <p class="text-2xl font-extrabold text-indigo-600 mt-0.5">{{ totalTopics() }}</p>
+          </div>
+        </div>
+
+        <!-- Search + status filter -->
+        <div class="flex items-center gap-3 mb-6 flex-wrap">
+          <div class="relative flex-1 min-w-[220px]">
+            <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+            <input [ngModel]="search()" (ngModelChange)="search.set($event)"
+                   placeholder="Search stacks…"
+                   class="w-full h-10 pl-10 pr-4 border border-slate-200 rounded-xl text-sm text-slate-700 bg-white outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all" />
+          </div>
+          <div class="inline-flex rounded-xl border border-slate-200 bg-white p-1">
+            @for (opt of [{ v: 'all', l: 'All' }, { v: 'active', l: 'Active' }, { v: 'inactive', l: 'Inactive' }]; track opt.v) {
+              <button (click)="statusFilter.set($any(opt.v))"
+                      class="px-3.5 h-8 rounded-lg text-xs font-semibold transition-all"
+                      [class]="statusFilter() === opt.v ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+                {{ opt.l }}
+              </button>
+            }
+          </div>
+        </div>
+      }
 
       @if (loading()) {
         <div class="flex items-center justify-center py-32">
@@ -31,10 +68,23 @@ import { StackDetail, TopicDetail } from '../../../core/models';
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
         </div>
+      } @else if (stacks().length === 0) {
+        <div class="bg-white border border-slate-200 rounded-2xl py-20 flex flex-col items-center gap-4 text-center">
+          <div class="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center">
+            <span class="material-icons text-indigo-400 text-3xl">layers</span>
+          </div>
+          <div>
+            <p class="text-slate-800 font-semibold">No stacks yet</p>
+            <p class="text-slate-400 text-sm mt-1">Create your first technology stack to get started</p>
+          </div>
+          <button (click)="openStackForm()" appBtn="primary" class="mt-1">
+            <span class="material-icons text-[17px]">add</span> New Stack
+          </button>
+        </div>
       } @else {
 
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          @for (stack of stacks(); track stack.id) {
+          @for (stack of filteredStacks(); track stack.id) {
             <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden"
                  [class.opacity-60]="!stack.active">
 
@@ -108,6 +158,11 @@ import { StackDetail, TopicDetail } from '../../../core/models';
               </div>
 
             </div>
+          } @empty {
+            <div class="col-span-full bg-white border border-slate-200 rounded-2xl py-16 text-center">
+              <p class="text-slate-500 font-medium">No stacks match your search / filter</p>
+              <button (click)="search.set(''); statusFilter.set('all')" class="mt-2 text-indigo-600 text-sm font-semibold hover:underline">Reset</button>
+            </div>
           }
         </div>
       }
@@ -149,12 +204,12 @@ import { StackDetail, TopicDetail } from '../../../core/models';
 
           <div class="flex justify-end gap-3 mt-6">
             <button (click)="closeModals()"
-                    class="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-all">
+                    appBtn="secondary">
               Cancel
             </button>
             <button [disabled]="!stackForm.stackName.trim() || saving()"
                     (click)="saveStack()"
-                    class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold shadow-lg shadow-indigo-500/25 disabled:opacity-60 disabled:cursor-not-allowed transition-all">
+                    appBtn="primary">
               @if (saving()) {
                 <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -194,12 +249,12 @@ import { StackDetail, TopicDetail } from '../../../core/models';
 
           <div class="flex justify-end gap-3 mt-6">
             <button (click)="closeModals()"
-                    class="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-all">
+                    appBtn="secondary">
               Cancel
             </button>
             <button [disabled]="!topicForm.topicName.trim() || saving()"
                     (click)="saveTopic()"
-                    class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold shadow-lg shadow-indigo-500/25 disabled:opacity-60 disabled:cursor-not-allowed transition-all">
+                    appBtn="primary">
               @if (saving()) {
                 <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -222,6 +277,22 @@ export class StackManagementComponent implements OnInit {
   stacks = signal<StackDetail[]>([]);
   loading = signal(true);
   saving = signal(false);
+
+  search = signal('');
+  statusFilter = signal<'all' | 'active' | 'inactive'>('all');
+
+  totalTopics  = computed(() => this.stacks().reduce((n, s) => n + s.topics.length, 0));
+  activeStacks = computed(() => this.stacks().filter(s => s.active).length);
+  filteredStacks = computed(() => {
+    const q = this.search().trim().toLowerCase();
+    const sf = this.statusFilter();
+    return this.stacks().filter(s => {
+      if (sf === 'active' && !s.active) return false;
+      if (sf === 'inactive' && s.active) return false;
+      if (q && !s.stackName.toLowerCase().includes(q) && !(s.description ?? '').toLowerCase().includes(q)) return false;
+      return true;
+    });
+  });
 
   stackModal = signal(false);
   topicModal = signal(false);

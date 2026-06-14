@@ -19,15 +19,9 @@
         <input type="date" [value]="endDate() ?? ''" (change)="endDate.set($any($event.target).value || null)"
                class="h-9 px-2 border border-slate-200 rounded-lg text-sm text-slate-700 outline-none focus:border-indigo-500" />
       </div>
-      <button (click)="applyRange()"
-              class="h-9 px-4 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold shadow-sm hover:-translate-y-0.5 transition-all">
-        Apply
-      </button>
+      <button (click)="applyRange()" appBtn="primary">Apply</button>
       @if (hasRange) {
-        <button (click)="resetRange()"
-                class="h-9 px-3 rounded-lg border border-slate-200 text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-all">
-          Reset
-        </button>
+        <button (click)="resetRange()" appBtn="secondary">Reset</button>
       }
     </div>
   </div>

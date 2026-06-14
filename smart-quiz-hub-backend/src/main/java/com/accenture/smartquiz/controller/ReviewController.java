@@ -69,6 +69,16 @@ public class ReviewController {
         return ResponseEntity.ok(ApiResponse.success(reviewService.getPendingReviews(currentUser, pageable)));
     }
 
+    @GetMapping("/reviewed")
+    @Operation(summary = "Get questions the current user has already reviewed (decided)")
+    public ResponseEntity<ApiResponse<PagedResponse<McqResponse>>> getReviewed(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
+        var pageable = PageRequest.of(page, size, Sort.by("reviewedAt").descending());
+        return ResponseEntity.ok(ApiResponse.success(reviewService.getReviewedByMe(currentUser, pageable)));
+    }
+
     @PostMapping("/auto-assign")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Auto-assign unreviewed questions to the least-loaded eligible SME (Admin only)")

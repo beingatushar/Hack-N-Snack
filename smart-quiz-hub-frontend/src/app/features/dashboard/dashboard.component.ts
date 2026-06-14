@@ -7,13 +7,13 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { McqService } from '../../core/services/mcq.service';
 import { AuthService } from '../../core/services/auth.service';
 import { DashboardStats } from '../../core/models';
+import { ButtonDirective } from '../../shared/components/button/button.directive';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink, MatCardModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule],
+  imports: [RouterLink, MatCardModule, MatIconModule, MatButtonModule, MatProgressSpinnerModule, ButtonDirective],
   templateUrl: './dashboard.component.html',
-  styleUrl: './dashboard.component.scss'
 })
 export class DashboardComponent implements OnInit {
   mcqService = inject(McqService);
@@ -33,12 +33,22 @@ export class DashboardComponent implements OnInit {
     const s = this.stats();
     if (!s) return [];
     return [
-      { label: 'Total Questions', value: s.totalQuestions,      icon: 'quiz',         color: '#6366F1' },
-      { label: 'Draft',           value: s.draftCount,          icon: 'edit_note',    color: '#94A3B8' },
-      { label: 'Ready for Review',value: s.readyForReviewCount, icon: 'pending',      color: '#F59E0B' },
-      { label: 'Under Review',    value: s.underReviewCount,    icon: 'rate_review',  color: '#3B82F6' },
-      { label: 'Approved',        value: s.approvedCount,       icon: 'check_circle', color: '#10B981' },
-      { label: 'Rejected',        value: s.rejectedCount,       icon: 'cancel',       color: '#EF4444' },
+      { label: 'Total Questions', value: s.totalQuestions,      icon: 'quiz',         color: '#6366F1', status: null },
+      { label: 'Draft',           value: s.draftCount,          icon: 'edit_note',    color: '#94A3B8', status: 'DRAFT' },
+      { label: 'Ready for Review',value: s.readyForReviewCount, icon: 'pending',      color: '#F59E0B', status: 'READY_FOR_REVIEW' },
+      { label: 'Under Review',    value: s.underReviewCount,    icon: 'rate_review',  color: '#3B82F6', status: 'UNDER_REVIEW' },
+      { label: 'Approved',        value: s.approvedCount,       icon: 'check_circle', color: '#10B981', status: 'APPROVED' },
+      { label: 'Rejected',        value: s.rejectedCount,       icon: 'cancel',       color: '#EF4444', status: 'REJECTED' },
+    ];
+  }
+
+  /** Admin-only insight/report destinations. */
+  get insightCards() {
+    return [
+      { label: 'Analytics',       desc: 'Trends, charts & KPIs',       icon: 'insights',      link: '/admin/analytics', color: '#6366F1' },
+      { label: 'SME Reports',     desc: 'Reviewer performance',        icon: 'groups',        link: '/admin/smes',      color: '#8B5CF6' },
+      { label: 'Question Bank',   desc: 'All questions & assignment',  icon: 'library_books', link: '/admin/questions', color: '#06B6D4' },
+      { label: 'Stacks & Topics', desc: 'Manage the taxonomy',         icon: 'layers',        link: '/admin/stacks',    color: '#10B981' },
     ];
   }
 }

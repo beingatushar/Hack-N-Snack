@@ -60,6 +60,11 @@ export class McqService {
     return this.http.post<ApiResponse<BulkUploadResponse>>(`${this.base}/bulk-upload`, form);
   }
 
+  /** Downloads the XLSX import template (same layout as export). */
+  downloadImportTemplate(): Observable<Blob> {
+    return this.http.get(`${this.base}/import-template`, { responseType: 'blob' });
+  }
+
   searchQuestions(query: string): Observable<McqResponse[]> {
     const params = new HttpParams().set('q', query);
     return this.http

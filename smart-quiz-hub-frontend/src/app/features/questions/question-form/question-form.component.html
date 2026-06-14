@@ -14,7 +14,7 @@
   </button>
 </div>
 
-<mat-dialog-content>
+<mat-dialog-content class="block !p-0 !m-0 max-h-[72vh] sm:min-w-[600px] overflow-y-auto">
 
   <!-- Terminal rejection notice — question is permanently locked (Story 1.3) -->
   @if (isLocked) {
@@ -37,35 +37,35 @@
     <!-- ══════════════════════════════════════════════════════════════════════
          STEP 1 — Context: Stack · Topic · Difficulty
          ══════════════════════════════════════════════════════════════════════ -->
-    <div class="section-block">
-      <div class="section-label">
-        <span class="step-num">1</span>
+    <div class="px-7 py-5 border-b border-slate-100 last:border-b-0">
+      <div class="flex items-center gap-2 text-[11px] font-bold text-slate-500 uppercase tracking-[0.08em] mb-3.5">
+        <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-md bg-indigo-500 text-white text-[0.65rem] font-extrabold flex-shrink-0">1</span>
         <span>Question Context</span>
       </div>
 
       <!-- Stack + Topic row -->
       <div class="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <label class="field-label">Technology Stack <span class="text-rose-400">*</span></label>
-          <div class="select-wrap">
+          <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-[0.06em] mb-1.5">Technology Stack <span class="text-rose-400">*</span></label>
+          <div class="relative">
             <select formControlName="stackId"
               (change)="onStackChange(+$any($event.target).value)"
-              class="custom-select">
+              class="w-full h-[42px] pl-3 pr-8 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 text-sm outline-none appearance-none transition-colors focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 focus:bg-white">
               <option [value]="null">Choose stack…</option>
               @for (s of stacks(); track s.id) {
                 <option [value]="s.id">{{ s.stackName }}</option>
               }
             </select>
-            <span class="material-icons select-icon">expand_more</span>
+            <span class="material-icons absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[1.1rem] pointer-events-none">expand_more</span>
           </div>
         </div>
 
         <div>
-          <label class="field-label">Topic <span class="text-rose-400">*</span></label>
-          <div class="select-wrap">
+          <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-[0.06em] mb-1.5">Topic <span class="text-rose-400">*</span></label>
+          <div class="relative">
             <select formControlName="topicId"
               [attr.disabled]="topics().length === 0 ? true : null"
-              class="custom-select"
+              class="w-full h-[42px] pl-3 pr-8 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 text-sm outline-none appearance-none transition-colors focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 focus:bg-white"
               [class.opacity-50]="topics().length === 0"
               [class.cursor-not-allowed]="topics().length === 0">
               <option [value]="null">{{ topics().length === 0 ? 'Select stack first' : 'Choose topic…' }}</option>
@@ -73,14 +73,14 @@
                 <option [value]="t.id">{{ t.topicName }}</option>
               }
             </select>
-            <span class="material-icons select-icon">expand_more</span>
+            <span class="material-icons absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[1.1rem] pointer-events-none">expand_more</span>
           </div>
         </div>
       </div>
 
       <!-- Difficulty pills -->
       <div>
-        <label class="field-label mb-2">Difficulty <span class="text-rose-400">*</span></label>
+        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-[0.06em] mb-2">Difficulty <span class="text-rose-400">*</span></label>
         <div class="flex gap-2">
           @for (d of difficulties; track d.value) {
             <button type="button"
@@ -103,9 +103,9 @@
     <!-- ══════════════════════════════════════════════════════════════════════
          STEP 2 — Question
          ══════════════════════════════════════════════════════════════════════ -->
-    <div class="section-block" [class.section-locked]="!step1Complete">
-      <div class="section-label">
-        <span class="step-num" [class.step-locked]="!step1Complete">2</span>
+    <div class="px-7 py-5 border-b border-slate-100 last:border-b-0" [class.opacity-50]="!step1Complete" [class.pointer-events-none]="!step1Complete">
+      <div class="flex items-center gap-2 text-[11px] font-bold text-slate-500 uppercase tracking-[0.08em] mb-3.5">
+        <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-md text-white text-[0.65rem] font-extrabold flex-shrink-0" [class.bg-slate-300]="!step1Complete" [class.bg-indigo-500]="step1Complete">2</span>
         <span>Question</span>
         @if (!step1Complete) {
           <span class="ml-auto text-[11px] text-slate-400 font-normal">Complete step 1 first</span>
@@ -143,9 +143,9 @@
     <!-- ══════════════════════════════════════════════════════════════════════
          STEP 3 — Answer Options
          ══════════════════════════════════════════════════════════════════════ -->
-    <div class="section-block" [class.section-locked]="!step1Complete">
-      <div class="section-label">
-        <span class="step-num" [class.step-locked]="!step1Complete">3</span>
+    <div class="px-7 py-5 border-b border-slate-100 last:border-b-0" [class.opacity-50]="!step1Complete" [class.pointer-events-none]="!step1Complete">
+      <div class="flex items-center gap-2 text-[11px] font-bold text-slate-500 uppercase tracking-[0.08em] mb-3.5">
+        <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-md text-white text-[0.65rem] font-extrabold flex-shrink-0" [class.bg-slate-300]="!step1Complete" [class.bg-indigo-500]="step1Complete">3</span>
         <span>Answer Options</span>
         <span class="ml-auto text-[11px] font-normal text-slate-400">
           Click an option to mark it as correct
@@ -165,14 +165,16 @@
         @for (optCtrl of optionsArray.controls; track $index; let i = $index) {
           <div [formGroupName]="i"
                (click)="toggleCorrect(i)"
-               class="option-card group"
-               [class.option-correct]="isCorrect(i)"
-               [class.option-default]="!isCorrect(i)">
+               class="flex items-center gap-2.5 py-2 pl-2 pr-2.5 rounded-[14px] border-2 cursor-pointer transition-all select-none group"
+               [ngClass]="isCorrect(i)
+                 ? 'bg-green-50 border-green-300 ring-4 ring-green-500/10'
+                 : 'bg-slate-50 border-slate-200 hover:border-indigo-200 hover:bg-indigo-50'">
 
             <!-- Left: Letter badge -->
-            <div class="option-badge"
-                 [class.option-badge-correct]="isCorrect(i)"
-                 [class.option-badge-default]="!isCorrect(i)">
+            <div class="flex items-center justify-center w-[30px] h-[30px] rounded-lg flex-shrink-0 transition-all"
+                 [ngClass]="isCorrect(i)
+                   ? 'bg-green-500 text-white shadow-sm shadow-green-500/40'
+                   : 'bg-indigo-100 text-indigo-600'">
               @if (isCorrect(i)) {
                 <span class="material-icons text-[14px]">check</span>
               } @else {
@@ -184,8 +186,10 @@
             <input formControlName="text"
               (click)="$event.stopPropagation()"
               [placeholder]="'Type option ' + optionLabel(i) + '…'"
-              class="option-input"
-              [class.option-input-correct]="isCorrect(i)" />
+              class="flex-1 py-2 px-2.5 border rounded-lg text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:ring-4"
+              [ngClass]="isCorrect(i)
+                ? 'border-green-300 bg-green-50 focus:border-green-500 focus:ring-green-500/10'
+                : 'border-slate-200 bg-white focus:border-indigo-500 focus:ring-indigo-500/10'" />
 
             <!-- Right: Correct badge + Remove -->
             <div class="flex items-center gap-1.5 flex-shrink-0">

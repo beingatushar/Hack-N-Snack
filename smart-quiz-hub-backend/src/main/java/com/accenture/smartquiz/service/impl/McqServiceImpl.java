@@ -44,7 +44,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -244,22 +247,53 @@ public class McqServiceImpl implements McqService {
     public BulkUploadResponse bulkUpload(MultipartFile file, SmartQuizUserDetails currentUser) {
         List<String> errors = new ArrayList<>();
         int success = 0;
-        int rowNum = 1;
+        int dataRows = 0;
 
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
             Sheet sheet = workbook.getSheetAt(0);
+            Row headerRow = sheet.getRow(0);
+            if (headerRow == null) {
+                return failure("The sheet is empty — expected a header row. Download the template to see the format.");
+            }
+
+            // Header-driven parsing: resolve columns by name so the exported file is
+            // re-importable and any extra metadata columns are simply ignored.
+            Map<String, Integer> col = new HashMap<>();
+            TreeMap<Integer, Integer> optionsByLetter = new TreeMap<>();
+            for (Cell cell : headerRow) {
+                String name = getCellString(headerRow, cell.getColumnIndex());
+                if (name.isBlank()) continue;
+                String lower = name.toLowerCase();
+                if (lower.startsWith("option")) {
+                    try {
+                        optionsByLetter.put(letterToIndex(name.substring("option".length()).trim()), cell.getColumnIndex());
+                    } catch (RuntimeException ignore) { /* not a lettered "Option X" header */ }
+                } else {
+                    col.put(lower, cell.getColumnIndex());
+                }
+            }
+            List<Integer> optionCols = new ArrayList<>(optionsByLetter.values());
+
+            List<String> missing = new ArrayList<>();
+            for (String req : List.of("stack", "topic", "difficulty", "question", "correct answers")) {
+                if (!col.containsKey(req)) missing.add(req);
+            }
+            if (optionCols.isEmpty()) missing.add("Option A/B/C…");
+            if (!missing.isEmpty()) {
+                return failure("Invalid format. Missing column(s): " + String.join(", ", missing)
+                        + ". Download the template to see the expected layout.");
+            }
 
             for (Row row : sheet) {
-                if (row.getRowNum() == 0) continue; // skip header
-                rowNum = row.getRowNum() + 1;
-
+                if (row.getRowNum() == 0) continue;
+                if (isBlankRow(row, col, optionCols)) continue;
+                dataRows++;
                 try {
-                    McqQuestion question = parseRow(row, currentUser);
-                    mcqRepo.save(question);
+                    mcqRepo.save(parseRow(row, col, optionCols, currentUser));
                     success++;
                 } catch (Exception e) {
-                    errors.add("Row " + rowNum + ": " + e.getMessage());
-                    log.warn("Bulk upload row {} failed: {}", rowNum, e.getMessage());
+                    errors.add("Row " + (row.getRowNum() + 1) + ": " + e.getMessage());
+                    log.warn("Bulk upload row {} failed: {}", row.getRowNum() + 1, e.getMessage());
                 }
             }
         } catch (IOException e) {
@@ -268,11 +302,17 @@ public class McqServiceImpl implements McqService {
         }
 
         return BulkUploadResponse.builder()
-                .totalRows(rowNum - 1)
+                .totalRows(dataRows)
                 .successCount(success)
                 .failureCount(errors.size())
                 .errors(errors)
                 .build();
+    }
+
+    private BulkUploadResponse failure(String message) {
+        return BulkUploadResponse.builder()
+                .totalRows(0).successCount(0).failureCount(1)
+                .errors(List.of(message)).build();
     }
 
     @Override
@@ -298,64 +338,51 @@ public class McqServiceImpl implements McqService {
     }
 
     /**
-     * Parses a bulk-upload XLSX row.
+     * Parses one data row using the resolved header column map.
      *
-     * Expected column layout:
-     *   0  – Question Stem
-     *   1  – Options (pipe-separated, at least 4: "Opt1|Opt2|Opt3|Opt4")
-     *   2  – Correct option indices (comma-separated, 0-based: "1" or "0,2")
-     *   3  – Difficulty (EASY / MEDIUM / HARD)
-     *   4  – Stack Name
-     *   5  – Topic Name
+     * Format (single layout for both import and export):
+     *   Stack | Topic | Difficulty | Question | Option A | Option B | … | Correct Answers
+     * Options are filled left-to-right (no gaps). "Correct Answers" holds the option
+     * letters of the correct choices, e.g. "A" or "A, C". Extra columns are ignored.
      */
-    private McqQuestion parseRow(Row row, SmartQuizUserDetails currentUser) {
-        String questionStem      = getCellString(row, 0);
-        String optionsPiped      = getCellString(row, 1);
-        String correctIdxStr     = getCellString(row, 2);
-        String difficultyStr     = getCellString(row, 3).toUpperCase();
-        String stackName         = getCellString(row, 4);
-        String topicName         = getCellString(row, 5);
-
-        if (questionStem.isBlank()) throw new IllegalArgumentException("Question stem is empty");
+    private McqQuestion parseRow(Row row, Map<String, Integer> col, List<Integer> optionCols,
+                                 SmartQuizUserDetails currentUser) {
+        String questionStem = getCellString(row, col.get("question"));
+        if (questionStem.isBlank()) throw new IllegalArgumentException("Question is empty");
         if (mcqRepo.existsByQuestionStemIgnoreCase(questionStem))
             throw new IllegalArgumentException("Duplicate question — already exists in the question bank");
 
-        List<String> options = Arrays.stream(optionsPiped.split("\\|"))
-                .map(String::trim)
-                .filter(s -> !s.isBlank())
-                .collect(Collectors.toList());
-        if (options.size() < 4)
-            throw new IllegalArgumentException("At least 4 options required (pipe-separated in column 2)");
-
-        List<Integer> correctIndices;
-        try {
-            correctIndices = Arrays.stream(correctIdxStr.split(","))
-                    .map(String::trim)
-                    .filter(s -> !s.isBlank())
-                    .map(Integer::parseInt)
-                    .collect(Collectors.toList());
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Correct option indices must be comma-separated integers (0-based)");
+        // Options are contiguous from "Option A": stop at the first blank.
+        List<String> options = new ArrayList<>();
+        for (int c : optionCols) {
+            String v = getCellString(row, c);
+            if (v.isBlank()) break;
+            options.add(v);
         }
-        if (correctIndices.isEmpty())
-            throw new IllegalArgumentException("At least one correct option index is required");
-        if (correctIndices.stream().anyMatch(i -> i < 0 || i >= options.size()))
-            throw new IllegalArgumentException("Correct option indices out of range (must be 0 to " + (options.size() - 1) + ")");
+        if (options.size() < 4)
+            throw new IllegalArgumentException("At least 4 options required (fill Option A–D, left to right)");
 
+        List<Integer> correctIndices =
+                parseCorrectAnswers(getCellString(row, col.get("correct answers")), options.size());
+
+        String difficultyStr = getCellString(row, col.get("difficulty")).toUpperCase();
         Difficulty difficulty;
         try {
             difficulty = Difficulty.valueOf(difficultyStr);
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid difficulty: " + difficultyStr);
+            throw new IllegalArgumentException("Invalid difficulty '" + difficultyStr + "' (use EASY, MEDIUM or HARD)");
         }
 
+        String stackName = getCellString(row, col.get("stack"));
         TechnologyStack stack = stackRepo.findAll().stream()
                 .filter(s -> s.getStackName().equalsIgnoreCase(stackName))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Unknown stack: " + stackName));
 
+        String topicName = getCellString(row, col.get("topic"));
         Topic topic = topicRepo.findByStackIdAndTopicNameIgnoreCase(stack.getId(), topicName)
-                .orElseThrow(() -> new IllegalArgumentException("Unknown topic: " + topicName));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Unknown topic '" + topicName + "' in stack '" + stackName + "'"));
 
         return McqQuestion.builder()
                 .questionStem(questionStem)
@@ -367,6 +394,54 @@ public class McqServiceImpl implements McqService {
                 .creator(userRepo.getReferenceById(currentUser.getUserId()))
                 .status(McqStatus.DRAFT)
                 .build();
+    }
+
+    /** Parses a "Correct Answers" cell ("A", "A, C", "A|C", or 1-based numbers) into indices. */
+    private List<Integer> parseCorrectAnswers(String raw, int optionCount) {
+        if (raw == null || raw.isBlank())
+            throw new IllegalArgumentException("Correct answer(s) required (e.g. 'A' or 'A, C')");
+        List<Integer> indices = Arrays.stream(raw.split("[,|/;]"))
+                .map(String::trim).filter(s -> !s.isBlank())
+                .map(token -> {
+                    int idx = letterToIndex(token);
+                    if (idx < 0 || idx >= optionCount)
+                        throw new IllegalArgumentException(
+                                "Correct answer '" + token + "' is out of range (only " + optionCount + " options)");
+                    return idx;
+                })
+                .distinct().sorted().collect(Collectors.toList());
+        if (indices.isEmpty())
+            throw new IllegalArgumentException("At least one correct answer is required");
+        return indices;
+    }
+
+    /** A row is blank when its Question, Stack and all Option cells are empty (skipped silently). */
+    private boolean isBlankRow(Row row, Map<String, Integer> col, List<Integer> optionCols) {
+        if (!getCellString(row, col.get("question")).isBlank()) return false;
+        if (!getCellString(row, col.get("stack")).isBlank()) return false;
+        for (int c : optionCols) if (!getCellString(row, c).isBlank()) return false;
+        return true;
+    }
+
+    /** 0-based index → spreadsheet column letter ("A", "B", … "Z", "AA"). */
+    private String letter(int index) {
+        StringBuilder sb = new StringBuilder();
+        int i = index + 1;
+        while (i > 0) { int rem = (i - 1) % 26; sb.insert(0, (char) ('A' + rem)); i = (i - 1) / 26; }
+        return sb.toString();
+    }
+
+    /** Option letter ("A", "C", "AA") or a 1-based number ("1") → 0-based index. */
+    private int letterToIndex(String token) {
+        String t = token.trim().toUpperCase();
+        if (t.isEmpty()) throw new IllegalArgumentException("Empty answer token");
+        if (t.chars().allMatch(Character::isDigit)) return Integer.parseInt(t) - 1;
+        int idx = 0;
+        for (char ch : t.toCharArray()) {
+            if (ch < 'A' || ch > 'Z') throw new IllegalArgumentException("Invalid answer token: '" + token + "'");
+            idx = idx * 26 + (ch - 'A' + 1);
+        }
+        return idx - 1;
     }
 
     private String getCellString(Row row, int col) {
@@ -446,71 +521,110 @@ public class McqServiceImpl implements McqService {
         List<McqQuestion> questions = mcqRepo.findForExport(
                 status == null ? McqStatus.APPROVED : status, stackId, topicId, difficulty);
 
-        // Determine the maximum number of options across all questions (at least 4)
-        int maxOptions = questions.stream()
+        int maxOptions = Math.max(4, questions.stream()
                 .mapToInt(q -> q.getOptions() == null ? 0 : q.getOptions().size())
-                .max().orElse(4);
-        maxOptions = Math.max(maxOptions, 4);
+                .max().orElse(4));
 
         try (Workbook wb = new XSSFWorkbook()) {
             Sheet sheet = wb.createSheet("Questions");
+            CellStyle header = headerStyle(wb);
 
-            CellStyle headerStyle = wb.createCellStyle();
-            Font font = wb.createFont();
-            font.setBold(true);
-            headerStyle.setFont(font);
-            headerStyle.setFillForegroundColor(IndexedColors.CORNFLOWER_BLUE.getIndex());
-            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-
-            // Build dynamic headers
-            List<String> headers = new ArrayList<>(
-                    List.of("ID", "Stack", "Topic", "Difficulty", "Status", "Question"));
-            for (int i = 1; i <= maxOptions; i++) headers.add("Option " + i);
-            headers.addAll(List.of("Correct Options (1-based)", "Creator", "Reviewer", "AI Score"));
+            // Core round-trip columns first, then read-only metadata (ignored on re-import).
+            List<String> headers = new ArrayList<>(List.of("Stack", "Topic", "Difficulty", "Question"));
+            for (int i = 0; i < maxOptions; i++) headers.add("Option " + letter(i));
+            headers.add("Correct Answers");
+            headers.addAll(List.of("Status", "Creator", "Reviewer", "AI Similarity %", "ID"));
 
             Row headerRow = sheet.createRow(0);
             for (int i = 0; i < headers.size(); i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(headers.get(i));
-                cell.setCellStyle(headerStyle);
+                cell.setCellStyle(header);
             }
 
             int rowIdx = 1;
             for (McqQuestion q : questions) {
                 Row row = sheet.createRow(rowIdx++);
-                row.createCell(0).setCellValue(q.getId());
-                row.createCell(1).setCellValue(q.getStack().getStackName());
-                row.createCell(2).setCellValue(q.getTopic().getTopicName());
-                row.createCell(3).setCellValue(q.getDifficulty().name());
-                row.createCell(4).setCellValue(q.getStatus().name());
-                row.createCell(5).setCellValue(q.getQuestionStem());
+                int c = 0;
+                row.createCell(c++).setCellValue(q.getStack().getStackName());
+                row.createCell(c++).setCellValue(q.getTopic().getTopicName());
+                row.createCell(c++).setCellValue(q.getDifficulty().name());
+                row.createCell(c++).setCellValue(q.getQuestionStem());
 
                 List<String> opts = q.getOptions() != null ? q.getOptions() : List.of();
                 for (int i = 0; i < maxOptions; i++) {
-                    row.createCell(6 + i).setCellValue(i < opts.size() ? opts.get(i) : "");
+                    row.createCell(c++).setCellValue(i < opts.size() ? opts.get(i) : "");
                 }
 
-                int correctCol = 6 + maxOptions;
-                String correctLabel = q.getCorrectOptionIndices() == null ? "" :
-                        q.getCorrectOptionIndices().stream()
-                                .map(i -> String.valueOf(i + 1))
-                                .collect(Collectors.joining(", "));
-                row.createCell(correctCol).setCellValue(correctLabel);
-                row.createCell(correctCol + 1).setCellValue(q.getCreator().getFullName());
-                row.createCell(correctCol + 2).setCellValue(
-                        q.getReviewer() != null ? q.getReviewer().getFullName() : "");
-                row.createCell(correctCol + 3).setCellValue(
-                        q.getAiSimilarityScore() != null ? q.getAiSimilarityScore().doubleValue() : 0.0);
+                String correct = q.getCorrectOptionIndices() == null ? "" :
+                        q.getCorrectOptionIndices().stream().sorted()
+                                .map(this::letter).collect(Collectors.joining(", "));
+                row.createCell(c++).setCellValue(correct);
+
+                row.createCell(c++).setCellValue(q.getStatus().name());
+                row.createCell(c++).setCellValue(q.getCreator().getFullName());
+                row.createCell(c++).setCellValue(q.getReviewer() != null ? q.getReviewer().getFullName() : "");
+                row.createCell(c++).setCellValue(
+                        q.getAiSimilarityScore() != null ? q.getAiSimilarityScore().doubleValue() * 100 : 0.0);
+                row.createCell(c).setCellValue(q.getId());
             }
 
             for (int i = 0; i < headers.size(); i++) sheet.autoSizeColumn(i);
-
-            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-            wb.write(out);
-            return out.toByteArray();
+            return toBytes(wb);
         } catch (IOException e) {
             throw new RuntimeException("Failed to generate XLSX export", e);
         }
+    }
+
+    @Override
+    public byte[] importTemplate() {
+        try (Workbook wb = new XSSFWorkbook()) {
+            Sheet sheet = wb.createSheet("Questions");
+            CellStyle header = headerStyle(wb);
+
+            List<String> headers = List.of("Stack", "Topic", "Difficulty", "Question",
+                    "Option A", "Option B", "Option C", "Option D", "Correct Answers");
+            Row hr = sheet.createRow(0);
+            for (int i = 0; i < headers.size(); i++) {
+                Cell cell = hr.createCell(i);
+                cell.setCellValue(headers.get(i));
+                cell.setCellStyle(header);
+            }
+
+            // Example rows — replace Stack/Topic with names that exist in your hub.
+            String[][] examples = {
+                {"Core Java", "Collections", "EASY", "Which interface does ArrayList implement?",
+                 "List", "Set", "Map", "Queue", "A"},
+                {"Core Java", "Concurrency", "HARD", "Which of these are thread-safe?",
+                 "ArrayList", "ConcurrentHashMap", "Vector", "HashMap", "B, C"},
+            };
+            int r = 1;
+            for (String[] ex : examples) {
+                Row row = sheet.createRow(r++);
+                for (int i = 0; i < ex.length; i++) row.createCell(i).setCellValue(ex[i]);
+            }
+
+            for (int i = 0; i < headers.size(); i++) sheet.autoSizeColumn(i);
+            return toBytes(wb);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to generate import template", e);
+        }
+    }
+
+    private CellStyle headerStyle(Workbook wb) {
+        CellStyle style = wb.createCellStyle();
+        Font font = wb.createFont();
+        font.setBold(true);
+        style.setFont(font);
+        style.setFillForegroundColor(IndexedColors.CORNFLOWER_BLUE.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        return style;
+    }
+
+    private byte[] toBytes(Workbook wb) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        wb.write(out);
+        return out.toByteArray();
     }
 
     private Specification<McqQuestion> buildSpec(McqStatus status, Long stackId, Difficulty difficulty,

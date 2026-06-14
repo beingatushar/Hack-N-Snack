@@ -1,21 +1,19 @@
 <div class="animate-fade-up">
 
   <!-- Header -->
-  <div class="flex items-center justify-between mb-8">
+  <div class="flex items-center justify-between mb-6">
     <div>
       <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">My Questions</h1>
-      <p class="text-slate-500 text-sm mt-1">Manage and track your submitted questions</p>
+      <p class="text-slate-500 text-sm mt-1">Manage, track and analyse your submitted questions</p>
     </div>
     <div class="flex items-center gap-3">
-      <select (change)="onStatusFilter($any($event.target).value)"
-              class="h-10 pl-3 pr-8 border border-slate-200 rounded-xl text-sm text-slate-700 bg-white outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all appearance-none cursor-pointer">
-        @for (opt of statusOptions; track opt.value) {
-          <option [value]="opt.value">{{ opt.label }}</option>
-        }
-      </select>
-
-      <button [matMenuTriggerFor]="addMenu"
-              class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all">
+      @if (activeFilterCount() > 0) {
+        <button (click)="clearFilters()" appBtn="secondary">
+          <span class="material-icons text-[16px]">filter_alt_off</span>
+          Clear ({{ activeFilterCount() }})
+        </button>
+      }
+      <button [matMenuTriggerFor]="addMenu" appBtn="primary">
         <span class="material-icons text-[17px]">add</span>
         Add Question
         <span class="material-icons text-[18px] -mr-1">arrow_drop_down</span>
@@ -37,6 +35,44 @@
     </div>
   </div>
 
+  <!-- Analytics strip — click a card to filter the table -->
+  <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-7">
+    <button (click)="filterByStatus(null)"
+            class="text-left bg-white border rounded-2xl px-4 py-3.5 shadow-sm hover:-translate-y-0.5 hover:shadow-md transition-all"
+            [class.border-indigo-300]="filters()['status'] === null" [class.border-slate-200]="filters()['status'] !== null">
+      <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total</p>
+      <p class="text-2xl font-extrabold text-slate-900 mt-0.5">{{ stats().total }}</p>
+    </button>
+    <button (click)="filterByStatus('DRAFT')"
+            class="text-left bg-white border rounded-2xl px-4 py-3.5 shadow-sm hover:-translate-y-0.5 hover:shadow-md transition-all"
+            [class.border-slate-400]="filters()['status'] === 'DRAFT'" [class.border-slate-200]="filters()['status'] !== 'DRAFT'">
+      <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Drafts</p>
+      <p class="text-2xl font-extrabold text-slate-600 mt-0.5">{{ stats().drafts }}</p>
+    </button>
+    <button (click)="filterByStatus('UNDER_REVIEW')"
+            class="text-left bg-white border rounded-2xl px-4 py-3.5 shadow-sm hover:-translate-y-0.5 hover:shadow-md transition-all"
+            [class.border-blue-300]="filters()['status'] === 'UNDER_REVIEW'" [class.border-slate-200]="filters()['status'] !== 'UNDER_REVIEW'">
+      <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">In Review</p>
+      <p class="text-2xl font-extrabold text-blue-600 mt-0.5">{{ stats().inReview }}</p>
+    </button>
+    <button (click)="filterByStatus('MODIFICATION_REQUESTED')"
+            class="text-left bg-white border rounded-2xl px-4 py-3.5 shadow-sm hover:-translate-y-0.5 hover:shadow-md transition-all"
+            [class.border-violet-300]="filters()['status'] === 'MODIFICATION_REQUESTED'" [class.border-slate-200]="filters()['status'] !== 'MODIFICATION_REQUESTED'">
+      <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Needs Changes</p>
+      <p class="text-2xl font-extrabold text-violet-600 mt-0.5">{{ stats().needsChanges }}</p>
+    </button>
+    <button (click)="filterByStatus('APPROVED')"
+            class="text-left bg-white border rounded-2xl px-4 py-3.5 shadow-sm hover:-translate-y-0.5 hover:shadow-md transition-all"
+            [class.border-emerald-300]="filters()['status'] === 'APPROVED'" [class.border-slate-200]="filters()['status'] !== 'APPROVED'">
+      <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Approved</p>
+      <p class="text-2xl font-extrabold text-emerald-600 mt-0.5">{{ stats().approved }}</p>
+    </button>
+    <div class="bg-gradient-to-br from-indigo-600 to-violet-600 rounded-2xl px-4 py-3.5 shadow-lg shadow-indigo-500/25">
+      <p class="text-[11px] font-bold text-white/70 uppercase tracking-wider">Approval Rate</p>
+      <p class="text-2xl font-extrabold text-white mt-0.5">{{ stats().approvalRate }}%</p>
+    </div>
+  </div>
+
   @if (loading()) {
     <div class="flex items-center justify-center py-32">
       <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -44,7 +80,7 @@
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
       </svg>
     </div>
-  } @else if (questions().length === 0) {
+  } @else if (allRows().length === 0) {
     <div class="bg-white border border-slate-200 rounded-2xl py-20 flex flex-col items-center gap-4 text-center">
       <div class="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center">
         <span class="material-icons text-indigo-400 text-3xl">quiz</span>
@@ -53,12 +89,6 @@
         <p class="text-slate-800 font-semibold">No questions yet</p>
         <p class="text-slate-400 text-sm mt-1">Create your first question to get started</p>
       </div>
-      <button [matMenuTriggerFor]="addMenu"
-              class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold shadow-lg shadow-indigo-500/25 mt-2">
-        <span class="material-icons text-[17px]">add</span>
-        Add Question
-        <span class="material-icons text-[18px] -mr-1">arrow_drop_down</span>
-      </button>
     </div>
   } @else {
     <!-- Table -->
@@ -66,33 +96,42 @@
       <table class="w-full text-sm">
         <thead>
           <tr class="bg-slate-50 border-b border-slate-200">
-            <th class="text-left px-5 py-3.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Question</th>
-            <th class="text-left px-5 py-3.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Stack / Topic</th>
-            <th class="text-left px-5 py-3.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Difficulty</th>
-            <th class="text-left px-5 py-3.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
-            <th class="text-left px-5 py-3.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Updated</th>
-            <th class="text-left px-5 py-3.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Actions</th>
+            <th class="text-left px-5 py-3">
+              <app-th-cell label="Question" sortKey="stem" [sort]="sort()" (sortChange)="setSort($event)" />
+            </th>
+            <th class="text-left px-5 py-3">
+              <app-th-cell label="Stack / Topic" sortKey="stack" [sort]="sort()" (sortChange)="setSort($event)"
+                           [filterOptions]="stackOptions()" [filterValue]="filters()['stack']" (filterChange)="setFilter('stack', $event)" />
+            </th>
+            <th class="text-left px-5 py-3">
+              <app-th-cell label="Difficulty" sortKey="difficulty" [sort]="sort()" (sortChange)="setSort($event)"
+                           [filterOptions]="difficultyOptions" [filterValue]="filters()['difficulty']" (filterChange)="setFilter('difficulty', $event)" />
+            </th>
+            <th class="text-left px-5 py-3">
+              <app-th-cell label="Status" sortKey="status" [sort]="sort()" (sortChange)="setSort($event)"
+                           [filterOptions]="statusOptions" [filterValue]="filters()['status']" (filterChange)="setFilter('status', $event)" />
+            </th>
+            <th class="text-left px-5 py-3">
+              <app-th-cell label="Updated" sortKey="updated" [sort]="sort()" (sortChange)="setSort($event)" />
+            </th>
+            <th class="text-left px-5 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Actions</th>
           </tr>
         </thead>
         <tbody>
-          @for (q of questions(); track q.id) {
+          @for (q of rows(); track q.id) {
             <tr class="border-b border-slate-100 hover:bg-slate-50/60 transition-colors last:border-0">
               <td class="px-5 py-4 max-w-[280px]">
-                <span class="text-slate-800 font-medium leading-snug line-clamp-2" [title]="q.questionStem">
-                  {{ truncate(q.questionStem) }}
-                </span>
+                <span class="text-slate-800 font-medium leading-snug line-clamp-2" [title]="q.questionStem">{{ truncate(q.questionStem) }}</span>
               </td>
               <td class="px-5 py-4">
                 <p class="text-slate-800 font-semibold text-xs">{{ q.stackName }}</p>
                 <p class="text-slate-400 text-xs mt-0.5">{{ q.topicName }}</p>
               </td>
               <td class="px-5 py-4">
-                <span class="diff-badge" [ngClass]="q.difficulty.toLowerCase()">{{ q.difficulty }}</span>
+                <span [class]="diffBadge(q.difficulty)">{{ q.difficulty }}</span>
               </td>
               <td class="px-5 py-4">
-                <span class="status-badge" [ngClass]="q.status.toLowerCase()">
-                  {{ q.status.replaceAll('_', ' ') }}
-                </span>
+                <span [class]="statusBadge(q.status)">{{ statusLabel(q.status) }}</span>
               </td>
               <td class="px-5 py-4 whitespace-nowrap">
                 <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-[11px] font-medium"
@@ -103,31 +142,33 @@
               </td>
               <td class="px-5 py-4">
                 <div class="flex items-center gap-1">
-                  @if (q.status === 'DRAFT' || q.status === 'READY_FOR_REVIEW' || q.status === 'MODIFICATION_REQUESTED') {
-                    <button (click)="openEdit(q)" title="Edit"
-                            class="w-8 h-8 rounded-lg flex items-center justify-center text-indigo-500 hover:bg-indigo-50 transition-colors">
-                      <span class="material-icons text-[16px]">edit</span>
-                    </button>
-                  }
-                  @if (q.status === 'DRAFT' || q.status === 'MODIFICATION_REQUESTED') {
-                    <button (click)="submitForReview(q)" title="Submit for Review"
-                            class="w-8 h-8 rounded-lg flex items-center justify-center text-amber-500 hover:bg-amber-50 transition-colors">
-                      <span class="material-icons text-[16px]">send</span>
-                    </button>
-                  }
-                  @if (q.status === 'DRAFT' || q.status === 'READY_FOR_REVIEW') {
-                    <button (click)="delete(q)" title="Delete"
-                            class="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:bg-rose-50 transition-colors">
-                      <span class="material-icons text-[16px]">delete</span>
-                    </button>
-                  }
-                  @if ((q.status === 'MODIFICATION_REQUESTED' || q.status === 'REJECTED') && q.reviewerComments) {
-                    <button [title]="'Reviewer feedback: ' + q.reviewerComments"
-                            class="w-8 h-8 rounded-lg flex items-center justify-center text-violet-500 hover:bg-violet-50 transition-colors">
-                      <span class="material-icons text-[16px]">feedback</span>
-                    </button>
-                  }
+                  <button (click)="openView(q)" matTooltip="View"
+                          class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 enabled:hover:bg-slate-100 enabled:hover:text-slate-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                    <span class="material-icons text-[16px]">visibility</span>
+                  </button>
+                  <button (click)="openEdit(q)" matTooltip="Edit"
+                          [disabled]="!(q.status === 'DRAFT' || q.status === 'READY_FOR_REVIEW' || q.status === 'MODIFICATION_REQUESTED')"
+                          class="w-8 h-8 rounded-lg flex items-center justify-center text-indigo-500 enabled:hover:bg-indigo-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                    <span class="material-icons text-[16px]">edit</span>
+                  </button>
+                  <button (click)="submitForReview(q)" matTooltip="Submit for Review"
+                          [disabled]="!(q.status === 'DRAFT' || q.status === 'MODIFICATION_REQUESTED')"
+                          class="w-8 h-8 rounded-lg flex items-center justify-center text-amber-500 enabled:hover:bg-amber-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                    <span class="material-icons text-[16px]">send</span>
+                  </button>
+                  <button (click)="delete(q)" matTooltip="Delete"
+                          [disabled]="!(q.status === 'DRAFT' || q.status === 'READY_FOR_REVIEW')"
+                          class="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 enabled:hover:bg-rose-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                    <span class="material-icons text-[16px]">delete</span>
+                  </button>
                 </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="6" class="px-5 py-16 text-center">
+                <p class="text-slate-500 font-medium">No questions match the current filters</p>
+                <button (click)="clearFilters()" class="mt-2 text-indigo-600 text-sm font-semibold hover:underline">Clear filters</button>
               </td>
             </tr>
           }
@@ -137,20 +178,14 @@
       <!-- Pagination -->
       <div class="flex items-center justify-between px-5 py-3.5 border-t border-slate-100 bg-slate-50/50">
         <p class="text-xs text-slate-400">
-          Showing {{ page() * pageSize() + 1 }}–{{ page() * pageSize() + questions().length }} of {{ totalElements() }} questions
+          @if (totalElements() > 0) {
+            Showing {{ page() * pageSize() + 1 }}–{{ page() * pageSize() + rows().length }} of {{ totalElements() }}
+          } @else { 0 results }
         </p>
         <div class="flex items-center gap-2">
-          <button [disabled]="page() === 0"
-                  (click)="page.set(page()-1); loadQuestions()"
-                  class="h-8 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-            ← Prev
-          </button>
-          <span class="text-xs text-slate-500 px-2">Page {{ page() + 1 }}</span>
-          <button [disabled]="(page()+1)*pageSize() >= totalElements()"
-                  (click)="page.set(page()+1); loadQuestions()"
-                  class="h-8 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-            Next →
-          </button>
+          <button [disabled]="page() === 0" (click)="prevPage()" appBtn="secondary" size="sm">← Prev</button>
+          <span class="text-xs text-slate-500 px-2">Page {{ page() + 1 }} / {{ totalPages() }}</span>
+          <button [disabled]="page() + 1 >= totalPages()" (click)="nextPage()" appBtn="secondary" size="sm">Next →</button>
         </div>
       </div>
     </div>

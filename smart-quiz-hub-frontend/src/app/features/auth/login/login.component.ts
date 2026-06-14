@@ -19,7 +19,6 @@ import { SnackService } from '../../../core/services/snack.service';
     MatButtonModule, MatIconModule, MatProgressSpinnerModule
   ],
   templateUrl: './login.component.html',
-  styleUrl: './login.component.scss'
 })
 export class LoginComponent {
   private fb     = inject(FormBuilder);

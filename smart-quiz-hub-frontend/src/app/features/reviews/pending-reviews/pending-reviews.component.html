@@ -1,17 +1,72 @@
 <div class="animate-fade-up">
 
   <!-- Header -->
-  <div class="flex items-center justify-between mb-8">
+  <div class="flex items-center justify-between mb-5">
     <div>
-      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Pending Reviews</h1>
-      <p class="text-slate-500 text-sm mt-1">Review and provide feedback on submitted questions</p>
+      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Reviews</h1>
+      <p class="text-slate-500 text-sm mt-1">
+        {{ tab() === 'pending' ? 'Review and decide on questions assigned to you' : 'Questions you have already decided' }}
+      </p>
     </div>
-    @if (totalElements() > 0) {
+    @if (tab() === 'pending' && totalElements() > 0) {
       <span class="px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold border border-amber-200">
         {{ totalElements() }} pending
       </span>
     }
   </div>
+
+  <!-- Tabs -->
+  <div class="inline-flex rounded-xl border border-slate-200 bg-white p-1 mb-5">
+    <button (click)="setTab('pending')"
+            class="px-4 h-9 rounded-lg text-sm font-semibold transition-all"
+            [class]="tab() === 'pending' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+      Pending
+    </button>
+    <button (click)="setTab('reviewed')"
+            class="px-4 h-9 rounded-lg text-sm font-semibold transition-all"
+            [class]="tab() === 'reviewed' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+      Reviewed by me
+    </button>
+  </div>
+
+  <!-- Sort & filter toolbar -->
+  @if (allRows().length > 0) {
+    <div class="flex items-center gap-2 flex-wrap mb-5 bg-white border border-slate-200 rounded-2xl px-4 py-2.5 shadow-sm">
+      <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider mr-1">Sort</span>
+      <button [matMenuTriggerFor]="sortMenu" appBtn="secondary" size="sm">
+        {{ sortLabel() }}
+        <span class="material-icons text-[18px] text-slate-400">arrow_drop_down</span>
+      </button>
+      <mat-menu #sortMenu="matMenu">
+        @for (f of sortFields; track f.key) {
+          <button mat-menu-item (click)="setSortKey(f.key)">
+            <span class="material-icons text-[16px] mr-2 align-middle" [class.opacity-0]="sort().key !== f.key">check</span>
+            <span class="align-middle">{{ f.label }}</span>
+          </button>
+        }
+      </mat-menu>
+      <button (click)="toggleDir()" appBtn="secondary" size="icon" [matTooltip]="sort().dir === 'asc' ? 'Ascending' : 'Descending'">
+        <span class="material-icons text-[18px]">{{ sort().dir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+      </button>
+
+      <span class="w-px h-6 bg-slate-200 mx-1"></span>
+
+      <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider mr-1">Filter</span>
+      <div class="flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200">
+        <span class="text-sm text-slate-600">Stack</span>
+        <app-column-filter label="Stack" [options]="stackOptions()" [selected]="filters()['stack']" (selectedChange)="setFilter('stack', $event)" />
+      </div>
+      <div class="flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200">
+        <span class="text-sm text-slate-600">Difficulty</span>
+        <app-column-filter label="Difficulty" [options]="difficultyOptions" [selected]="filters()['difficulty']" (selectedChange)="setFilter('difficulty', $event)" />
+      </div>
+      @if (activeFilterCount() > 0) {
+        <button (click)="clearFilters()" appBtn="ghost" size="sm">
+          <span class="material-icons text-[16px]">filter_alt_off</span> Clear
+        </button>
+      }
+    </div>
+  }
 
   @if (loading()) {
     <div class="flex items-center justify-center py-32">
@@ -20,14 +75,16 @@
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
       </svg>
     </div>
-  } @else if (questions().length === 0) {
+  } @else if (allRows().length === 0) {
     <div class="bg-white border border-slate-200 rounded-2xl py-20 flex flex-col items-center gap-4 text-center">
       <div class="w-16 h-16 rounded-2xl bg-green-50 flex items-center justify-center">
-        <span class="material-icons text-green-400 text-3xl">done_all</span>
+        <span class="material-icons text-green-400 text-3xl">{{ tab() === 'pending' ? 'done_all' : 'history' }}</span>
       </div>
       <div>
-        <p class="text-slate-800 font-semibold">All caught up!</p>
-        <p class="text-slate-400 text-sm mt-1">No questions pending review. Check back later.</p>
+        <p class="text-slate-800 font-semibold">{{ tab() === 'pending' ? 'All caught up!' : 'Nothing reviewed yet' }}</p>
+        <p class="text-slate-400 text-sm mt-1">
+          {{ tab() === 'pending' ? 'No questions pending review. Check back later.' : 'Questions you decide on will appear here.' }}
+        </p>
       </div>
     </div>
   } @else {
@@ -38,7 +95,7 @@
           <!-- Card header -->
           <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/60">
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="diff-badge" [ngClass]="q.difficulty.toLowerCase()">{{ q.difficulty }}</span>
+              <span [class]="diffBadge(q.difficulty)">{{ q.difficulty }}</span>
               <span class="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold border border-indigo-100">{{ q.stackName }}</span>
               <span class="px-2.5 py-1 rounded-full bg-cyan-50 text-cyan-700 text-xs font-semibold border border-cyan-100">{{ q.topicName }}</span>
             </div>
@@ -48,7 +105,7 @@
                 <span class="material-icons text-[12px]">schedule</span>
                 {{ q.updatedAt | relativeTime }}
               </span>
-              <span class="status-badge under_review">Under Review</span>
+              <span [class]="statusBadge(q.status)">{{ q.status.replaceAll('_', ' ') }}</span>
             </div>
           </div>
 
@@ -60,74 +117,81 @@
             <div class="grid grid-cols-2 gap-3 mb-5">
               @for (opt of q.options; track $index; let i = $index) {
                 <div class="flex items-start gap-3 p-3.5 rounded-xl border transition-colors"
-                     [class]="q.correctOptionIndices?.includes(i)
-                       ? 'bg-emerald-50 border-emerald-200'
-                       : 'bg-slate-50 border-slate-200'">
+                     [class]="q.correctOptionIndices.includes(i) ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'">
                   <span class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 mt-px"
-                        [class]="q.correctOptionIndices?.includes(i)
-                          ? 'bg-emerald-500 text-white'
-                          : 'bg-indigo-100 text-indigo-700'">
+                        [class]="q.correctOptionIndices.includes(i) ? 'bg-emerald-500 text-white' : 'bg-indigo-100 text-indigo-700'">
                     {{ optionLabel(i) }}
                   </span>
                   <span class="text-sm text-slate-700 leading-snug flex-1">{{ opt }}</span>
-                  @if (q.correctOptionIndices?.includes(i)) {
+                  @if (q.correctOptionIndices.includes(i)) {
                     <span class="material-icons text-emerald-500 text-[18px] flex-shrink-0">check_circle</span>
                   }
                 </div>
               }
             </div>
 
-            <!-- Review comments -->
-            <div>
-              <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                Review Comments <span class="text-rose-400">(required for rejection)</span>
-              </label>
-              <textarea rows="3" [(ngModel)]="reviewComments[q.id]"
-                placeholder="Provide constructive feedback to the question creator..."
-                class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all resize-none bg-slate-50 focus:bg-white"></textarea>
-            </div>
+            @if (tab() === 'pending') {
+              <!-- Review comments -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                  Review Comments <span class="text-rose-400">(required for reject / suggest)</span>
+                </label>
+                <textarea rows="3" [(ngModel)]="reviewComments[q.id]"
+                  placeholder="Provide constructive feedback to the question creator..."
+                  class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all resize-none bg-slate-50 focus:bg-white"></textarea>
+              </div>
+            } @else if (q.reviewerComments) {
+              <!-- Your feedback (read-only) -->
+              <div class="flex gap-3 rounded-xl px-4 py-3 border"
+                   [class]="q.status === 'REJECTED' ? 'bg-rose-50 border-rose-200' : (q.status === 'APPROVED' ? 'bg-emerald-50 border-emerald-200' : 'bg-violet-50 border-violet-200')">
+                <span class="material-icons text-[18px] mt-0.5 flex-shrink-0 text-slate-400">feedback</span>
+                <div>
+                  <p class="text-[10px] font-bold uppercase tracking-widest mb-1 text-slate-500">Your feedback</p>
+                  <p class="text-sm text-slate-700 leading-relaxed">{{ q.reviewerComments }}</p>
+                </div>
+              </div>
+            }
           </div>
 
           <!-- Actions -->
           <div class="flex items-center gap-3 px-6 py-4 border-t border-slate-100">
-            <button (click)="approve(q)"
-                    class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 text-white text-sm font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:-translate-y-0.5 transition-all">
-              <span class="material-icons text-[17px]">check_circle</span>
-              Approve
-            </button>
-            <button (click)="requestModification(q)"
-                    matTooltip="Send back to the creator with comments — they can edit and resubmit"
-                    class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-semibold shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 hover:-translate-y-0.5 transition-all">
-              <span class="material-icons text-[17px]">edit_note</span>
-              Suggest Modifications
-            </button>
-            <button (click)="reject(q)"
-                    matTooltip="Permanently rejects — the question is locked from all future edits"
-                    class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 text-white text-sm font-semibold shadow-lg shadow-rose-500/25 hover:shadow-rose-500/40 hover:-translate-y-0.5 transition-all">
-              <span class="material-icons text-[17px]">cancel</span>
-              Reject
-            </button>
+            @if (tab() === 'pending') {
+              <button (click)="approve(q)" appBtn="success">
+                <span class="material-icons text-[17px]">check_circle</span> Approve
+              </button>
+              <button (click)="requestModification(q)" appBtn="accent"
+                      matTooltip="Send back to the creator with comments — they can edit and resubmit">
+                <span class="material-icons text-[17px]">edit_note</span> Suggest Modifications
+              </button>
+              <button (click)="reject(q)" appBtn="danger"
+                      matTooltip="Permanently rejects — the question is locked from all future edits">
+                <span class="material-icons text-[17px]">cancel</span> Reject
+              </button>
+            } @else {
+              <button (click)="openView(q)" appBtn="secondary">
+                <span class="material-icons text-[17px]">visibility</span> View Full Question
+              </button>
+            }
           </div>
+        </div>
+      } @empty {
+        <div class="bg-white border border-slate-200 rounded-2xl py-16 text-center">
+          <p class="text-slate-500 font-medium">No questions match the current filters</p>
+          <button (click)="clearFilters()" class="mt-2 text-indigo-600 text-sm font-semibold hover:underline">Clear filters</button>
         </div>
       }
     </div>
 
     <!-- Pagination -->
-    @if (totalElements() > 10) {
+    @if (totalPages() > 1) {
       <div class="flex items-center justify-between mt-6 bg-white border border-slate-200 rounded-xl px-5 py-3.5">
-        <p class="text-xs text-slate-400">{{ totalElements() }} questions total</p>
+        <p class="text-xs text-slate-400">
+          Showing {{ page() * pageSize() + 1 }}–{{ page() * pageSize() + questions().length }} of {{ totalElements() }}
+        </p>
         <div class="flex items-center gap-2">
-          <button [disabled]="page() === 0"
-                  (click)="page.set(page()-1); load()"
-                  class="h-8 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-            ← Prev
-          </button>
-          <span class="text-xs text-slate-500 px-2">Page {{ page() + 1 }}</span>
-          <button [disabled]="(page()+1)*10 >= totalElements()"
-                  (click)="page.set(page()+1); load()"
-                  class="h-8 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-            Next →
-          </button>
+          <button [disabled]="page() === 0" (click)="prevPage()" appBtn="secondary" size="sm">← Prev</button>
+          <span class="text-xs text-slate-500 px-2">Page {{ page() + 1 }} / {{ totalPages() }}</span>
+          <button [disabled]="page() + 1 >= totalPages()" (click)="nextPage()" appBtn="secondary" size="sm">Next →</button>
         </div>
       </div>
     }

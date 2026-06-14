@@ -6,13 +6,14 @@ import { CommonModule } from '@angular/common';
 import { Chart, registerables } from 'chart.js';
 import { AnalyticsService } from '../../core/services/analytics.service';
 import { AnalyticsOverview, QuestionAnalytics, ReviewerWorkload } from '../../core/models';
+import { ButtonDirective } from '../../shared/components/button/button.directive';
 
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-analytics',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ButtonDirective],
   templateUrl: './analytics.component.html'
 })
 export class AnalyticsComponent implements OnInit, AfterViewChecked, OnDestroy {

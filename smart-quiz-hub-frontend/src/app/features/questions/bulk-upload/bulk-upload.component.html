@@ -16,17 +16,23 @@
         <span class="material-icons text-indigo-500 text-[18px] flex-shrink-0 mt-0.5">info</span>
         <div class="flex-1">
           <div class="flex items-center justify-between gap-3">
-            <p class="text-sm font-semibold text-indigo-800">XLSX Template Format</p>
-            <button (click)="downloadTemplate()"
-                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs font-semibold transition-all flex-shrink-0">
+            <p class="text-sm font-semibold text-indigo-800">XLSX Format</p>
+            <button (click)="downloadTemplate()" [disabled]="downloadingTemplate()"
+                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs font-semibold transition-all flex-shrink-0 disabled:opacity-60">
               <span class="material-icons text-[14px]">download</span>
               Download Template
             </button>
           </div>
-          <p class="text-xs text-indigo-600 mt-1 leading-relaxed">
-            Columns: Question Stem · Option A · Option B · Option C · Option D · Correct Option (A/B/C/D) · Difficulty (EASY/MEDIUM/HARD) · Stack Name · Topic Name
-          </p>
-          <p class="text-xs text-indigo-500 mt-1">Open template in Excel, fill your data, save as <strong>.xlsx</strong>, then upload.</p>
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            @for (col of ['Stack','Topic','Difficulty','Question','Option A','Option B','Option C','Option D','…','Correct Answers']; track col) {
+              <span class="px-2 py-0.5 rounded-md bg-white border border-indigo-100 text-indigo-700 text-[11px] font-semibold">{{ col }}</span>
+            }
+          </div>
+          <ul class="text-xs text-indigo-600 mt-2.5 space-y-1 list-disc list-inside">
+            <li>Add as many <strong>Option</strong> columns as you need (min 4), filled left&#8209;to&#8209;right.</li>
+            <li><strong>Correct Answers</strong> = the option letters, e.g. <code class="bg-white px-1 rounded">A</code> or <code class="bg-white px-1 rounded">A, C</code> for multiple.</li>
+            <li>An <strong>exported file is re&#8209;importable</strong> as-is — extra columns (Status, Creator…) are ignored.</li>
+          </ul>
         </div>
       </div>
 
@@ -63,15 +69,12 @@
         <!-- Actions -->
         <div class="flex items-center justify-end gap-3 mt-5">
           @if (selectedFile()) {
-            <button (click)="reset()"
-                    class="flex items-center gap-1.5 h-10 px-4 rounded-xl border border-slate-200 text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-all">
+            <button (click)="reset()" appBtn="secondary">
               <span class="material-icons text-[16px]">close</span>
               Clear
             </button>
           }
-          <button (click)="upload()"
-                  [disabled]="!selectedFile() || uploading()"
-                  class="flex items-center gap-2 h-10 px-5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 disabled:opacity-60 disabled:cursor-not-allowed transition-all">
+          <button (click)="upload()" [disabled]="!selectedFile() || uploading()" appBtn="primary" size="lg">
             @if (uploading()) {
               <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

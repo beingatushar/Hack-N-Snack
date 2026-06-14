@@ -133,6 +133,17 @@ public class McqController {
                 .body(xlsx);
     }
 
+    @GetMapping("/import-template")
+    @Operation(summary = "Download the XLSX template for bulk import (same layout as export)")
+    public ResponseEntity<byte[]> importTemplate() {
+        byte[] xlsx = mcqService.importTemplate();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"question-import-template.xlsx\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(xlsx);
+    }
+
     @PostMapping(value = "/bulk-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Bulk upload MCQ questions from XLSX file")
     public ResponseEntity<ApiResponse<BulkUploadResponse>> bulkUpload(

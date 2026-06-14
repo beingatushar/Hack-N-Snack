@@ -42,6 +42,9 @@ public interface McqService {
     /** Full-text search across question stem and options using PostgreSQL FTS. */
     List<McqResponse> searchQuestions(String query, SmartQuizUserDetails currentUser);
 
-    /** Export filtered questions as an XLSX byte array. */
+    /** Export filtered questions as an XLSX byte array (same layout the importer accepts). */
     byte[] exportToXlsx(Long stackId, Long topicId, Difficulty difficulty, McqStatus status);
+
+    /** A blank XLSX template (headers + examples) matching the bulk-import format. */
+    byte[] importTemplate();
 }

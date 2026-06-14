@@ -5,6 +5,7 @@ import {
 } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { NgClass } from '@angular/common';
 import { McqService } from '../../../core/services/mcq.service';
 import { StackService } from '../../../core/services/stack.service';
 import { SnackService } from '../../../core/services/snack.service';
@@ -27,9 +28,8 @@ function atLeastOneCorrect(arr: AbstractControl): ValidationErrors | null {
 @Component({
   selector: 'app-question-form',
   standalone: true,
-  imports: [ReactiveFormsModule, MatDialogModule, MatProgressSpinnerModule],
+  imports: [ReactiveFormsModule, MatDialogModule, MatProgressSpinnerModule, NgClass],
   templateUrl: './question-form.component.html',
-  styleUrl: './question-form.component.scss'
 })
 export class QuestionFormComponent implements OnInit {
   private fb       = inject(FormBuilder);

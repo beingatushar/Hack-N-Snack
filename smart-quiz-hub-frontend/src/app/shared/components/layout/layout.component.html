@@ -43,11 +43,11 @@
       }
       @for (item of visibleItems(); track item.route) {
         <a [routerLink]="item.route"
-           routerLinkActive="nav-active"
+           routerLinkActive="!bg-indigo-500/20 !text-white"
            [title]="collapsed() ? item.label : ''"
            [class]="collapsed()
-             ? 'nav-link flex items-center justify-center w-full py-2.5 rounded-xl text-white/50 hover:text-white hover:bg-white/5 transition-all duration-150 cursor-pointer no-underline'
-             : 'nav-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/50 hover:text-white hover:bg-white/5 transition-all duration-150 text-sm font-medium cursor-pointer no-underline'">
+             ? 'flex items-center justify-center w-full py-2.5 rounded-xl text-white/50 hover:text-white hover:bg-white/5 transition-all duration-150 cursor-pointer no-underline'
+             : 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/50 hover:text-white hover:bg-white/5 transition-all duration-150 text-sm font-medium cursor-pointer no-underline'">
           <span class="material-icons text-[18px] flex-shrink-0">{{ item.icon }}</span>
           @if (!collapsed()) {
             <span>{{ item.label }}</span>
