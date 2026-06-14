@@ -187,3 +187,40 @@ export interface DuplicateCheckResponse {
   thresholdPercent: number;
   similar: SimilarQuestion[];
 }
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+export type NotificationType =
+  | 'REVIEW_ASSIGNED'
+  | 'QUESTION_APPROVED'
+  | 'QUESTION_REJECTED'
+  | 'QUESTION_SUBMITTED';
+
+export interface AppNotification {
+  id: number;
+  type: NotificationType;
+  title: string;
+  message: string;
+  questionId: number | null;
+  read: boolean;
+  createdAt: string;
+}
+
+// ── Analytics ─────────────────────────────────────────────────────────────────
+
+export interface WeeklyCount {
+  week: string;
+  count: number;
+}
+
+export interface AnalyticsOverview {
+  byStatus: Record<string, number>;
+  byStack: Record<string, number>;
+  byDifficulty: Record<string, number>;
+  weeklyTrend: WeeklyCount[];
+}
+
+export interface ReviewerWorkload {
+  reviewerName: string;
+  pendingCount: number;
+}

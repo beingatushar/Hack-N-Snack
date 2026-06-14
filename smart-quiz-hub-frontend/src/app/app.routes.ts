@@ -42,6 +42,12 @@ export const routes: Routes = [
           import('./features/admin/question-bank/question-bank.component').then(m => m.QuestionBankComponent)
       },
       {
+        path: 'admin/analytics',
+        canActivate: [adminGuard],
+        loadComponent: () =>
+          import('./features/analytics/analytics.component').then(m => m.AnalyticsComponent)
+      },
+      {
         path: 'admin/smes',
         canActivate: [adminGuard],
         loadComponent: () =>

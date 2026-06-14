@@ -37,4 +37,8 @@ export class ReviewService {
     const params = new HttpParams().set('page', page).set('size', size);
     return this.http.get<ApiResponse<PagedResponse<McqResponse>>>(`${this.base}/ready`, { params });
   }
+
+  autoAssignReviewers(): Observable<ApiResponse<null>> {
+    return this.http.post<ApiResponse<null>>(`${this.base}/auto-assign`, {});
+  }
 }

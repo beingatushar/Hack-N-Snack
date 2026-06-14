@@ -13,6 +13,8 @@ import com.accenture.smartquiz.security.SmartQuizUserDetails;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 public interface McqService {
 
     McqResponse createQuestion(McqRequest request, SmartQuizUserDetails currentUser);
@@ -36,4 +38,10 @@ public interface McqService {
 
     /** AI-driven similarity check for a candidate MCQ (Edit page, Level 2). */
     DuplicateCheckResponse checkDuplicate(DuplicateCheckRequest request);
+
+    /** Full-text search across question stem and options using PostgreSQL FTS. */
+    List<McqResponse> searchQuestions(String query, SmartQuizUserDetails currentUser);
+
+    /** Export filtered questions as an XLSX byte array. */
+    byte[] exportToXlsx(Long stackId, Long topicId, Difficulty difficulty, McqStatus status);
 }

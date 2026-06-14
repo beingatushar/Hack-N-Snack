@@ -12,12 +12,15 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/questions")
@@ -102,6 +105,29 @@ public class McqController {
     public ResponseEntity<ApiResponse<DashboardStatsResponse>> getStats(
             @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
         return ResponseEntity.ok(ApiResponse.success(mcqService.getDashboardStats(currentUser)));
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Full-text search across question stem and options (PostgreSQL FTS)")
+    public ResponseEntity<ApiResponse<List<McqResponse>>> search(
+            @RequestParam String q,
+            @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
+        return ResponseEntity.ok(ApiResponse.success(mcqService.searchQuestions(q, currentUser)));
+    }
+
+    @GetMapping("/export")
+    @Operation(summary = "Export questions to XLSX (admin: all statuses, default APPROVED)")
+    public ResponseEntity<byte[]> export(
+            @RequestParam(required = false) Long stackId,
+            @RequestParam(required = false) Long topicId,
+            @RequestParam(required = false) Difficulty difficulty,
+            @RequestParam(required = false, defaultValue = "APPROVED") McqStatus status) {
+        byte[] xlsx = mcqService.exportToXlsx(stackId, topicId, difficulty, status);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"questions.xlsx\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(xlsx);
     }
 
     @PostMapping(value = "/bulk-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

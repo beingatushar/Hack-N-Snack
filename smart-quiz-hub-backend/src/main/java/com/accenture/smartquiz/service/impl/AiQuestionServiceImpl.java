@@ -19,12 +19,15 @@ import com.accenture.smartquiz.service.SimilarityOutcome;
 import com.accenture.smartquiz.service.SimilarityService;
 import com.accenture.smartquiz.util.McqMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -53,14 +56,32 @@ public class AiQuestionServiceImpl implements AiQuestionService {
 
     /** Hard ceiling on AI calls per request, to bound cost/latency. */
     private static final int MAX_AI_CALLS = 4;
-
-    private final ChatClient.Builder chatClientBuilder;
     private final McqQuestionRepository mcqRepo;
     private final TechnologyStackRepository stackRepo;
     private final TopicRepository topicRepo;
     private final UserRepository userRepo;
     private final ObjectMapper objectMapper;
     private final SimilarityService similarityService;
+
+    // Reuse the OpenAI-compatible config (Groq by default). We call the HTTP API directly
+    // instead of via Spring AI's ChatClient — Spring AI 1.0.0-M3 fails to deserialize Groq's
+    // response because it adds extra usage fields (queue_time, prompt_time, ...) the M3 DTOs reject.
+    @Value("${spring.ai.openai.base-url}")
+    private String baseUrl;
+
+    @Value("${spring.ai.openai.api-key}")
+    private String apiKey;
+
+    @Value("${spring.ai.openai.chat.options.model}")
+    private String model;
+
+    @Value("${spring.ai.openai.chat.options.temperature:0.7}")
+    private double temperature;
+
+    @Value("${spring.ai.openai.chat.options.max-tokens:1000}")
+    private int maxTokens;
+
+    private final RestClient restClient = RestClient.create();
 
     @Override
     @Transactional
@@ -209,15 +230,32 @@ public class AiQuestionServiceImpl implements AiQuestionService {
                 """.formatted(count, topic, stack, difficulty, context);
     }
 
+    /**
+     * Calls the OpenAI-compatible chat completions endpoint directly via RestClient.
+     * Parsing with Jackson's readTree tolerates any provider-specific extra fields
+     * (e.g. Groq's queue_time/prompt_time), so it works across OpenAI, Groq, Ollama, etc.
+     */
     private List<Map<String, Object>> callAi(String prompt) {
         try {
-            ChatClient chatClient = chatClientBuilder.build();
-            String response = chatClient.prompt()
-                    .user(prompt)
-                    .call()
-                    .content();
+            Map<String, Object> requestBody = Map.of(
+                    "model", model,
+                    "temperature", temperature,
+                    "max_tokens", maxTokens,
+                    "messages", List.of(Map.of("role", "user", "content", prompt))
+            );
 
-            String json = extractJson(response);
+            String responseBody = restClient.post()
+                    .uri(baseUrl + "/v1/chat/completions")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(requestBody)
+                    .retrieve()
+                    .body(String.class);
+
+            JsonNode root = objectMapper.readTree(responseBody);
+            String content = root.path("choices").path(0).path("message").path("content").asText();
+
+            String json = extractJson(content);
             return objectMapper.readValue(json, new TypeReference<>() {});
         } catch (Exception e) {
             log.error("AI question generation failed: {}", e.getMessage());

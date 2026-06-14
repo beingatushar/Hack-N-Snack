@@ -23,4 +23,7 @@ public interface ReviewService {
     PagedResponse<McqResponse> getPendingReviews(SmartQuizUserDetails currentUser, Pageable pageable);
 
     PagedResponse<McqResponse> getReadyForReview(SmartQuizUserDetails currentUser, Pageable pageable);
+
+    /** Auto-assign READY_FOR_REVIEW questions with no reviewer to the least-loaded eligible SME. */
+    int autoAssignReviewers();
 }

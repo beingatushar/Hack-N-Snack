@@ -1,8 +1,10 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatInputModule } from '@angular/material/input';
 import { DatePipe, NgClass } from '@angular/common';
 import { McqService } from '../../../core/services/mcq.service';
 import { ReviewService } from '../../../core/services/review.service';
@@ -19,6 +21,7 @@ import { QuestionFormComponent } from '../../questions/question-form/question-fo
   standalone: true,
   imports: [
     MatButtonModule, MatIconModule, MatDialogModule, MatTooltipModule,
+    MatInputModule, FormsModule,
     DatePipe, NgClass
   ],
   templateUrl: './question-bank.component.html',
@@ -43,6 +46,9 @@ export class QuestionBankComponent implements OnInit {
 
   selectedIds = signal<Set<number>>(new Set());
   selectionCount = computed(() => this.selectedIds().size);
+
+  searchQuery = signal('');
+  searching = signal(false);
 
   get selectableQuestions(): McqResponse[] {
     return this.questions().filter(q =>
@@ -178,6 +184,46 @@ export class QuestionBankComponent implements OnInit {
       maxWidth: '600px', width: '100%'
     });
     ref.afterClosed().subscribe(result => { if (result) this.load(); });
+  }
+
+  search(): void {
+    const q = this.searchQuery().trim();
+    if (!q) { this.load(); return; }
+    this.searching.set(true);
+    this.loading.set(true);
+    this.mcqSvc.searchQuestions(q).subscribe({
+      next: results => {
+        this.questions.set(results);
+        this.totalElements.set(results.length);
+        this.loading.set(false);
+        this.searching.set(false);
+      },
+      error: () => { this.loading.set(false); this.searching.set(false); }
+    });
+  }
+
+  clearSearch(): void {
+    this.searchQuery.set('');
+    this.load();
+  }
+
+  autoAssign(): void {
+    this.reviewSvc.autoAssignReviewers().subscribe({
+      next: (r: any) => { this.snack.success(r.message ?? 'Auto-assign complete'); this.load(); },
+      error: (err: any) => this.snack.error(err.error?.message ?? 'Auto-assign failed')
+    });
+  }
+
+  exportXlsx(): void {
+    this.mcqSvc.exportQuestions({
+      stackId: this.stackFilter(),
+      status: this.statusFilter() ?? 'APPROVED'
+    }).subscribe(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'questions.xlsx'; a.click();
+      URL.revokeObjectURL(url);
+    });
   }
 
   truncate(text: string, max = 55): string {

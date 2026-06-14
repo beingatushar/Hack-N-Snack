@@ -69,6 +69,16 @@ public class ReviewController {
         return ResponseEntity.ok(ApiResponse.success(reviewService.getPendingReviews(currentUser, pageable)));
     }
 
+    @PostMapping("/auto-assign")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Auto-assign unreviewed questions to the least-loaded eligible SME (Admin only)")
+    public ResponseEntity<ApiResponse<String>> autoAssign(
+            @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
+        int count = reviewService.autoAssignReviewers();
+        return ResponseEntity.ok(ApiResponse.success(
+                count + " question(s) auto-assigned", null));
+    }
+
     @GetMapping("/ready")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get all questions in READY_FOR_REVIEW status (Admin only)")

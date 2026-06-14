@@ -16,6 +16,8 @@ import com.accenture.smartquiz.exception.UnauthorizedAccessException;
 import com.accenture.smartquiz.repository.McqQuestionRepository;
 import com.accenture.smartquiz.repository.UserRepository;
 import com.accenture.smartquiz.security.SmartQuizUserDetails;
+import com.accenture.smartquiz.entity.enums.NotificationType;
+import com.accenture.smartquiz.service.NotificationService;
 import com.accenture.smartquiz.service.ReviewService;
 import com.accenture.smartquiz.util.McqMapper;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ public class ReviewServiceImpl implements ReviewService {
 
     private final McqQuestionRepository mcqRepo;
     private final UserRepository userRepo;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -68,7 +71,16 @@ public class ReviewServiceImpl implements ReviewService {
         log.info("Question {} assigned to reviewer {} by admin {}", questionId,
                 reviewer.getId(), currentUser.getUserId());
 
-        return McqMapper.toResponse(mcqRepo.save(question));
+        McqResponse saved = McqMapper.toResponse(mcqRepo.save(question));
+
+        notificationService.push(reviewer.getId(),
+                NotificationType.REVIEW_ASSIGNED,
+                "Review Assignment",
+                "You have been assigned to review question #" + questionId + ": \""
+                        + truncate(question.getQuestionStem(), 80) + "\"",
+                questionId);
+
+        return saved;
     }
 
     @Override
@@ -166,7 +178,18 @@ public class ReviewServiceImpl implements ReviewService {
         log.info("Question {} {} by reviewer {}", questionId, decision,
                 currentUser.getEnterpriseId());
 
-        return McqMapper.toResponse(mcqRepo.save(question));
+        McqResponse result = McqMapper.toResponse(mcqRepo.save(question));
+
+        NotificationType notifType = decision == McqStatus.APPROVED
+                ? NotificationType.QUESTION_APPROVED : NotificationType.QUESTION_REJECTED;
+        String notifTitle = decision == McqStatus.APPROVED ? "Question Approved" : "Question Rejected";
+        String notifMsg = decision == McqStatus.APPROVED
+                ? "Your question #" + questionId + " has been approved."
+                : "Your question #" + questionId + " was rejected. Reviewer comments: "
+                        + (request.getComments() != null ? request.getComments() : "");
+        notificationService.push(question.getCreator().getId(), notifType, notifTitle, notifMsg, questionId);
+
+        return result;
     }
 
     @Override
@@ -189,8 +212,52 @@ public class ReviewServiceImpl implements ReviewService {
                 .map(McqMapper::toResponse));
     }
 
+    // ── Auto-assign ───────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public int autoAssignReviewers() {
+        List<McqQuestion> unassigned = mcqRepo.findUnassignedReadyForReview();
+        int assigned = 0;
+
+        for (McqQuestion question : unassigned) {
+            Long stackId = question.getStack().getId();
+            Long creatorId = question.getCreator().getId();
+
+            // Find eligible SMEs: mapped to this stack, not the creator
+            User reviewer = userRepo.findSmesByStackId(stackId).stream()
+                    .filter(u -> !u.getId().equals(creatorId))
+                    .min((a, b) -> Long.compare(
+                            mcqRepo.countByReviewerIdAndStatus(a.getId(), McqStatus.UNDER_REVIEW),
+                            mcqRepo.countByReviewerIdAndStatus(b.getId(), McqStatus.UNDER_REVIEW)))
+                    .orElse(null);
+
+            if (reviewer == null) continue;
+
+            question.setReviewer(reviewer);
+            question.setStatus(McqStatus.UNDER_REVIEW);
+            mcqRepo.save(question);
+
+            notificationService.push(reviewer.getId(),
+                    NotificationType.REVIEW_ASSIGNED,
+                    "Review Assignment",
+                    "You have been auto-assigned to review question #" + question.getId()
+                            + ": \"" + truncate(question.getQuestionStem(), 80) + "\"",
+                    question.getId());
+            assigned++;
+        }
+
+        log.info("Auto-assign: {} question(s) assigned", assigned);
+        return assigned;
+    }
+
     private McqQuestion findById(Long id) {
         return mcqRepo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("McqQuestion", id));
+    }
+
+    private String truncate(String text, int max) {
+        if (text == null) return "";
+        return text.length() > max ? text.substring(0, max) + "…" : text;
     }
 }

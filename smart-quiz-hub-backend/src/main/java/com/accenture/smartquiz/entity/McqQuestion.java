@@ -72,6 +72,10 @@ public class McqQuestion {
     @Column(name = "ai_similarity_score", precision = 5, scale = 4)
     private BigDecimal aiSimilarityScore;
 
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

@@ -125,6 +125,15 @@ export class MyQuestionsComponent implements OnInit {
     });
   }
 
+  exportXlsx(): void {
+    this.mcqSvc.exportQuestions({ status: this.statusFilter() ?? 'APPROVED' }).subscribe(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'my-questions.xlsx'; a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
   truncate(text: string, max = 60): string {
     return text.length > max ? text.slice(0, max) + '…' : text;
   }

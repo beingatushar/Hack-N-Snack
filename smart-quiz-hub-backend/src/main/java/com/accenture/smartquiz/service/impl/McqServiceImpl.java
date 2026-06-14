@@ -389,6 +389,88 @@ public class McqServiceImpl implements McqService {
         }
     }
 
+    // ── Level 3: Full-text search ──────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<McqResponse> searchQuestions(String query, SmartQuizUserDetails currentUser) {
+        if (query == null || query.isBlank()) return List.of();
+        List<McqQuestion> results = mcqRepo.searchFullText(query.trim());
+        return results.stream()
+                .filter(q -> canViewQuestion(q, currentUser))
+                .map(McqMapper::toResponse)
+                .toList();
+    }
+
+    private boolean canViewQuestion(McqQuestion question, SmartQuizUserDetails currentUser) {
+        if (currentUser.getRole() == UserRole.ADMIN) return true;
+        Long uid = currentUser.getUserId();
+        boolean isCreator = question.getCreator().getId().equals(uid);
+        boolean isReviewer = question.getReviewer() != null && question.getReviewer().getId().equals(uid);
+        return isCreator || isReviewer;
+    }
+
+    // ── Level 3: XLSX export ──────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] exportToXlsx(Long stackId, Long topicId, Difficulty difficulty, McqStatus status) {
+        List<McqQuestion> questions = mcqRepo.findForExport(
+                status == null ? McqStatus.APPROVED : status, stackId, topicId, difficulty);
+
+        try (Workbook wb = new XSSFWorkbook()) {
+            Sheet sheet = wb.createSheet("Questions");
+
+            // Header row
+            CellStyle headerStyle = wb.createCellStyle();
+            Font font = wb.createFont();
+            font.setBold(true);
+            headerStyle.setFont(font);
+            headerStyle.setFillForegroundColor(IndexedColors.CORNFLOWER_BLUE.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+            String[] headers = {"ID", "Stack", "Topic", "Difficulty", "Status",
+                    "Question", "Option A", "Option B", "Option C", "Option D",
+                    "Correct", "Creator", "Reviewer", "AI Score"};
+            Row headerRow = sheet.createRow(0);
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            // Data rows
+            int rowIdx = 1;
+            for (McqQuestion q : questions) {
+                Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(q.getId());
+                row.createCell(1).setCellValue(q.getStack().getStackName());
+                row.createCell(2).setCellValue(q.getTopic().getTopicName());
+                row.createCell(3).setCellValue(q.getDifficulty().name());
+                row.createCell(4).setCellValue(q.getStatus().name());
+                row.createCell(5).setCellValue(q.getQuestionStem());
+                row.createCell(6).setCellValue(q.getOptionA());
+                row.createCell(7).setCellValue(q.getOptionB());
+                row.createCell(8).setCellValue(q.getOptionC());
+                row.createCell(9).setCellValue(q.getOptionD());
+                row.createCell(10).setCellValue(q.getCorrectOption());
+                row.createCell(11).setCellValue(q.getCreator().getFullName());
+                row.createCell(12).setCellValue(q.getReviewer() != null ? q.getReviewer().getFullName() : "");
+                row.createCell(13).setCellValue(q.getAiSimilarityScore() != null
+                        ? q.getAiSimilarityScore().doubleValue() : 0.0);
+            }
+
+            // Auto-size first 14 columns
+            for (int i = 0; i < headers.length; i++) sheet.autoSizeColumn(i);
+
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            wb.write(out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to generate XLSX export", e);
+        }
+    }
+
     private Specification<McqQuestion> buildSpec(McqStatus status, Long stackId, Difficulty difficulty,
                                                    SmartQuizUserDetails currentUser) {
         return (root, query, cb) -> {

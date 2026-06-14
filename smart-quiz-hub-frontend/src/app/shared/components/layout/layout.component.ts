@@ -1,6 +1,11 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, computed, inject, signal } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { CommonModule } from '@angular/common';
 import { AuthService } from '../.././../core/services/auth.service';
+import { NotificationService } from '../../../core/services/notification.service';
+import { AppNotification } from '../../../core/models';
+import { Subscription, interval } from 'rxjs';
+import { switchMap, startWith } from 'rxjs/operators';
 
 interface NavItem {
   icon: string;
@@ -13,15 +18,20 @@ interface NavItem {
 @Component({
   selector: 'app-layout',
   standalone: true,
-  imports: [
-    RouterOutlet, RouterLink, RouterLinkActive
-  ],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, CommonModule],
   templateUrl: './layout.component.html',
   styleUrl: './layout.component.scss'
 })
-export class LayoutComponent {
+export class LayoutComponent implements OnInit, OnDestroy {
   auth = inject(AuthService);
+  notifService = inject(NotificationService);
   collapsed = signal(false);
+
+  unreadCount = signal(0);
+  notifications = signal<AppNotification[]>([]);
+  bellOpen = signal(false);
+
+  private pollSub?: Subscription;
 
   navItems: NavItem[] = [
     { icon: 'dashboard',     label: 'Dashboard',       route: '/dashboard' },
@@ -29,6 +39,7 @@ export class LayoutComponent {
     { icon: 'upload_file',   label: 'Bulk Upload',     route: '/bulk-upload' },
     { icon: 'rate_review',   label: 'Pending Reviews', route: '/reviews' },
     { icon: 'library_books', label: 'Question Bank',   route: '/admin/questions', adminOnly: true },
+    { icon: 'bar_chart',     label: 'Analytics',       route: '/admin/analytics', adminOnly: true },
     { icon: 'group',         label: 'SME Management',  route: '/admin/smes',      adminOnly: true },
     { icon: 'layers',        label: 'Stack Management', route: '/admin/stacks',    adminOnly: true }
   ];
@@ -39,6 +50,59 @@ export class LayoutComponent {
       (!i.smeOnly   || !this.auth.isAdmin())
     )
   );
+
+  ngOnInit() {
+    // Poll for unread count every 30 seconds
+    this.pollSub = interval(30_000).pipe(
+      startWith(0),
+      switchMap(() => this.notifService.getUnreadCount())
+    ).subscribe(count => this.unreadCount.set(count));
+  }
+
+  ngOnDestroy() {
+    this.pollSub?.unsubscribe();
+  }
+
+  toggleBell() {
+    this.bellOpen.update(v => !v);
+    if (this.bellOpen()) {
+      this.notifService.getNotifications(0, 10).subscribe(page => {
+        this.notifications.set(page.content);
+      });
+    }
+  }
+
+  markRead(id: number) {
+    this.notifService.markRead(id).subscribe(() => {
+      this.notifications.update(ns => ns.map(n => n.id === id ? { ...n, read: true } : n));
+      this.unreadCount.update(c => Math.max(0, c - 1));
+    });
+  }
+
+  markAllRead() {
+    this.notifService.markAllRead().subscribe(() => {
+      this.notifications.update(ns => ns.map(n => ({ ...n, read: true })));
+      this.unreadCount.set(0);
+    });
+  }
+
+  notifIcon(type: string): string {
+    switch (type) {
+      case 'REVIEW_ASSIGNED':   return 'assignment';
+      case 'QUESTION_APPROVED': return 'check_circle';
+      case 'QUESTION_REJECTED': return 'cancel';
+      default:                  return 'notifications';
+    }
+  }
+
+  notifColor(type: string): string {
+    switch (type) {
+      case 'REVIEW_ASSIGNED':   return 'text-blue-400';
+      case 'QUESTION_APPROVED': return 'text-green-400';
+      case 'QUESTION_REJECTED': return 'text-red-400';
+      default:                  return 'text-slate-400';
+    }
+  }
 
   user = this.auth.currentUser;
 

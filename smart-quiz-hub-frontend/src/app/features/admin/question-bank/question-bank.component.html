@@ -25,7 +25,39 @@
         <span class="material-icons text-[17px]">auto_awesome</span>
         AI Generate
       </button>
+      <button (click)="autoAssign()"
+              class="flex items-center gap-2 h-10 px-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 text-sm font-semibold hover:bg-amber-100 transition-all"
+              title="Auto-assign unreviewed questions to the least-loaded reviewer">
+        <span class="material-icons text-[17px]">assignment_ind</span>
+        Auto-Assign
+      </button>
+      <button (click)="exportXlsx()"
+              class="flex items-center gap-2 h-10 px-4 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold hover:bg-emerald-100 transition-all">
+        <span class="material-icons text-[17px]">download</span>
+        Export XLSX
+      </button>
     </div>
+  </div>
+
+  <!-- Search bar -->
+  <div class="flex gap-2 mb-4">
+    <div class="flex-1 relative">
+      <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+      <input [(ngModel)]="searchQuery"
+             (keyup.enter)="search()"
+             placeholder="Full-text search across question stems and options…"
+             class="w-full h-10 pl-10 pr-4 border border-slate-200 rounded-xl text-sm text-slate-700 bg-white outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all" />
+    </div>
+    <button (click)="search()"
+            class="h-10 px-4 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-all">
+      Search
+    </button>
+    @if (searchQuery()) {
+      <button (click)="clearSearch()"
+              class="h-10 px-4 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-all">
+        Clear
+      </button>
+    }
   </div>
 
   <!-- Bulk action bar -->
