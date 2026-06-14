@@ -79,8 +79,23 @@ export class PendingReviewsComponent implements OnInit {
       this.snack.error('Please provide feedback comments before rejecting');
       return;
     }
+    if (!confirm('Rejecting is permanent — this question will be locked from all future edits. Continue?')) {
+      return;
+    }
     this.reviewSvc.submitReview(q.id, { decision: 'REJECTED', comments }).subscribe({
       next: () => { this.snack.success('Question rejected with feedback'); this.load(); },
+      error: err => this.snack.error(err.error?.message ?? 'Failed')
+    });
+  }
+
+  requestModification(q: McqResponse): void {
+    const comments = this.reviewComments[q.id];
+    if (!comments?.trim()) {
+      this.snack.error('Please describe the changes the creator should make');
+      return;
+    }
+    this.reviewSvc.submitReview(q.id, { decision: 'MODIFICATION_REQUESTED', comments }).subscribe({
+      next: () => { this.snack.success('Modifications requested — sent back to creator'); this.load(); },
       error: err => this.snack.error(err.error?.message ?? 'Failed')
     });
   }

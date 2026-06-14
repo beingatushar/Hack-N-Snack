@@ -52,6 +52,7 @@ export class MyQuestionsComponent implements OnInit {
     { value: 'DRAFT', label: 'Draft' },
     { value: 'READY_FOR_REVIEW', label: 'Ready for Review' },
     { value: 'UNDER_REVIEW', label: 'Under Review' },
+    { value: 'MODIFICATION_REQUESTED', label: 'Modification Requested' },
     { value: 'APPROVED', label: 'Approved' },
     { value: 'REJECTED', label: 'Rejected' }
   ];

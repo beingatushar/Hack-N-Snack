@@ -2,6 +2,25 @@ package com.accenture.smartquiz.entity.enums;
 
 import java.util.Set;
 
+/**
+ * Question lifecycle state machine (Epic 1).
+ *
+ * <pre>
+ *   DRAFT ─────────────► READY_FOR_REVIEW ◄────────────┐
+ *                              │                        │
+ *                              ▼                        │
+ *                        UNDER_REVIEW                   │ (creator edits & resubmits)
+ *               ┌──────────────┼──────────────┐        │
+ *               ▼              ▼               ▼        │
+ *          APPROVED       REJECTED   MODIFICATION_REQUESTED
+ *          (terminal)    (terminal)          │          │
+ *                                            └──────────┘
+ * </pre>
+ *
+ * REJECTED and APPROVED are terminal — {@link #allowedTransitions()} is empty.
+ * MODIFICATION_REQUESTED is the "suggest modifications" state: the creator may edit and
+ * resubmit, which transitions back to READY_FOR_REVIEW.
+ */
 public enum McqStatus {
 
     DRAFT {
@@ -19,7 +38,13 @@ public enum McqStatus {
     UNDER_REVIEW {
         @Override
         public Set<McqStatus> allowedTransitions() {
-            return Set.of(APPROVED, REJECTED);
+            return Set.of(APPROVED, REJECTED, MODIFICATION_REQUESTED);
+        }
+    },
+    MODIFICATION_REQUESTED {
+        @Override
+        public Set<McqStatus> allowedTransitions() {
+            return Set.of(READY_FOR_REVIEW, DRAFT);
         }
     },
     APPROVED {
@@ -31,7 +56,7 @@ public enum McqStatus {
     REJECTED {
         @Override
         public Set<McqStatus> allowedTransitions() {
-            return Set.of(READY_FOR_REVIEW);
+            return Set.of();
         }
     };
 
@@ -39,5 +64,10 @@ public enum McqStatus {
 
     public boolean canTransitionTo(McqStatus target) {
         return allowedTransitions().contains(target);
+    }
+
+    /** A terminal state can never transition further (APPROVED, REJECTED). */
+    public boolean isTerminal() {
+        return allowedTransitions().isEmpty();
     }
 }

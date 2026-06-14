@@ -16,6 +16,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -40,7 +41,8 @@ public class McqController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update an existing MCQ question")
+    @PreAuthorize("@securityService.isOwner(#id, principal)")
+    @Operation(summary = "Update an existing MCQ question (creator or admin only)")
     public ResponseEntity<ApiResponse<McqResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody McqRequest request,
@@ -92,7 +94,8 @@ public class McqController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete a question")
+    @PreAuthorize("@securityService.isOwner(#id, principal)")
+    @Operation(summary = "Delete a question (creator or admin only)")
     public ResponseEntity<ApiResponse<Void>> delete(
             @PathVariable Long id,
             @AuthenticationPrincipal SmartQuizUserDetails currentUser) {

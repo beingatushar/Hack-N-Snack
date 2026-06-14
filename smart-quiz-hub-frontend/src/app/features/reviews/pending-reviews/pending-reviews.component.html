@@ -88,7 +88,14 @@
               <span class="material-icons text-[17px]">check_circle</span>
               Approve
             </button>
+            <button (click)="requestModification(q)"
+                    matTooltip="Send back to the creator with comments — they can edit and resubmit"
+                    class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-semibold shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 hover:-translate-y-0.5 transition-all">
+              <span class="material-icons text-[17px]">edit_note</span>
+              Suggest Modifications
+            </button>
             <button (click)="reject(q)"
+                    matTooltip="Permanently rejects — the question is locked from all future edits"
                     class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 text-white text-sm font-semibold shadow-lg shadow-rose-500/25 hover:shadow-rose-500/40 hover:-translate-y-0.5 transition-all">
               <span class="material-icons text-[17px]">cancel</span>
               Reject

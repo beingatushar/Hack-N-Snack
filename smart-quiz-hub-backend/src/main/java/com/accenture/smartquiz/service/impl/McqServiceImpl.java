@@ -146,6 +146,7 @@ public class McqServiceImpl implements McqService {
         enforceNotDuplicate(question);
 
         question.setStatus(McqStatus.READY_FOR_REVIEW);
+        question.setSubmittedAt(java.time.Instant.now());
         return McqMapper.toResponse(mcqRepo.save(question));
     }
 
@@ -384,17 +385,24 @@ public class McqServiceImpl implements McqService {
     }
 
     private void assertCanEdit(McqQuestion question, SmartQuizUserDetails currentUser) {
+        // Story 1.3 — "rejected for life": a rejected question is permanently locked from
+        // all edits, for everyone including admins.
+        if (question.getStatus() == McqStatus.REJECTED) {
+            throw new UnauthorizedAccessException(
+                "This question has been permanently rejected and can no longer be edited");
+        }
+
         boolean isCreator = question.getCreator().getId().equals(currentUser.getUserId());
         boolean isAdmin = currentUser.getRole() == UserRole.ADMIN;
 
         boolean creatorEditable = isCreator &&
                 (question.getStatus() == McqStatus.DRAFT ||
                  question.getStatus() == McqStatus.READY_FOR_REVIEW ||
-                 question.getStatus() == McqStatus.REJECTED);
+                 question.getStatus() == McqStatus.MODIFICATION_REQUESTED);
 
         if (!creatorEditable && !isAdmin) {
             throw new UnauthorizedAccessException(
-                "You can only edit your own questions that are in DRAFT, READY FOR REVIEW, or REJECTED status");
+                "You can only edit your own questions in DRAFT, READY FOR REVIEW, or MODIFICATION REQUESTED status");
         }
     }
 

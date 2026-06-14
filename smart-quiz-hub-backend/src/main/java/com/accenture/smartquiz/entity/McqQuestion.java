@@ -72,6 +72,14 @@ public class McqQuestion {
     @Column(nullable = false)
     private Long version;
 
+    /** Set when the creator submits (or resubmits) for review — baseline for turnaround analytics. */
+    @Column(name = "submitted_at")
+    private Instant submittedAt;
+
+    /** Set when a reviewer records a decision (approve/reject/request changes). */
+    @Column(name = "reviewed_at")
+    private Instant reviewedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

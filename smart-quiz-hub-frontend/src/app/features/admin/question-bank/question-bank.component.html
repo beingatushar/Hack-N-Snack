@@ -175,13 +175,21 @@
                     </button>
                   }
 
-                  <!-- Edit (not APPROVED — admin can edit DRAFT, READY, UNDER_REVIEW, REJECTED) -->
-                  @if (q.status !== 'APPROVED') {
+                  <!-- Edit (not APPROVED/REJECTED — both are terminal & locked from edits) -->
+                  @if (q.status !== 'APPROVED' && q.status !== 'REJECTED') {
                     <button (click)="openEdit(q)"
                             title="Edit Question"
                             class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-indigo-600 transition-colors">
                       <span class="material-icons text-[16px]">edit</span>
                     </button>
+                  }
+
+                  <!-- Locked indicator for terminal rejected questions -->
+                  @if (q.status === 'REJECTED') {
+                    <span title="Permanently rejected — locked from edits"
+                          class="w-8 h-8 rounded-lg flex items-center justify-center text-rose-400">
+                      <span class="material-icons text-[16px]">lock</span>
+                    </span>
                   }
 
                   <!-- Delete (admin can delete any non-DRAFT-of-others; simpler: show for all, let backend enforce) -->

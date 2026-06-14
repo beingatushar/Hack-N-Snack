@@ -9,6 +9,11 @@ server:
 spring:
   application:
     name: smart-quiz-ai-hub
+  # Java 21 virtual threads — scales concurrent bulk uploads & AI-generation endpoints
+  # without a large platform-thread pool (Story 3.1).
+  threads:
+    virtual:
+      enabled: true
   # DB_PASSWORD is required — no default. Set it in .env or as an environment variable.
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/smart_quiz_hub}

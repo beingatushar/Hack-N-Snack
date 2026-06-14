@@ -164,32 +164,57 @@ public class ReviewServiceImpl implements ReviewService {
         }
 
         McqStatus decision = request.getDecision();
-        if (decision != McqStatus.APPROVED && decision != McqStatus.REJECTED) {
-            throw new InvalidStatusTransitionException("Review decision must be APPROVED or REJECTED");
+        if (decision != McqStatus.APPROVED && decision != McqStatus.REJECTED
+                && decision != McqStatus.MODIFICATION_REQUESTED) {
+            throw new InvalidStatusTransitionException(
+                    "Review decision must be APPROVED, REJECTED, or MODIFICATION_REQUESTED");
         }
-        if (decision == McqStatus.REJECTED &&
-                (request.getComments() == null || request.getComments().isBlank())) {
-            throw new IllegalArgumentException("Comments are mandatory when rejecting a question");
+        // Comments are mandatory for any decision that sends the question back to the creator.
+        if ((decision == McqStatus.REJECTED || decision == McqStatus.MODIFICATION_REQUESTED)
+                && (request.getComments() == null || request.getComments().isBlank())) {
+            throw new IllegalArgumentException(
+                    "Comments are mandatory when rejecting or requesting modifications");
+        }
+        if (!question.getStatus().canTransitionTo(decision)) {
+            throw new InvalidStatusTransitionException(question.getStatus(), decision);
         }
 
         question.setStatus(decision);
         question.setReviewerComments(request.getComments());
+        question.setReviewedAt(java.time.Instant.now());
 
         log.info("Question {} {} by reviewer {}", questionId, decision,
                 currentUser.getEnterpriseId());
 
         McqResponse result = McqMapper.toResponse(mcqRepo.save(question));
 
-        NotificationType notifType = decision == McqStatus.APPROVED
-                ? NotificationType.QUESTION_APPROVED : NotificationType.QUESTION_REJECTED;
-        String notifTitle = decision == McqStatus.APPROVED ? "Question Approved" : "Question Rejected";
-        String notifMsg = decision == McqStatus.APPROVED
-                ? "Your question #" + questionId + " has been approved."
-                : "Your question #" + questionId + " was rejected. Reviewer comments: "
-                        + (request.getComments() != null ? request.getComments() : "");
-        notificationService.push(question.getCreator().getId(), notifType, notifTitle, notifMsg, questionId);
+        // Java 21 switch expression — routes each decision to its notification (Story 3.1).
+        ReviewOutcome outcome = switch (decision) {
+            case APPROVED -> new ReviewOutcome(
+                    NotificationType.QUESTION_APPROVED, "Question Approved",
+                    "Your question #" + questionId + " has been approved.");
+            case REJECTED -> new ReviewOutcome(
+                    NotificationType.QUESTION_REJECTED, "Question Rejected",
+                    "Your question #" + questionId + " was rejected. Reviewer comments: "
+                            + nullToEmpty(request.getComments()));
+            case MODIFICATION_REQUESTED -> new ReviewOutcome(
+                    NotificationType.MODIFICATION_REQUESTED, "Modifications Requested",
+                    "Your question #" + questionId + " needs changes before approval. "
+                            + "Reviewer comments: " + nullToEmpty(request.getComments()));
+            default -> throw new InvalidStatusTransitionException(
+                    "Unsupported review decision: " + decision);
+        };
+        notificationService.push(question.getCreator().getId(),
+                outcome.type(), outcome.title(), outcome.message(), questionId);
 
         return result;
+    }
+
+    /** Notification payload derived from a review decision. */
+    private record ReviewOutcome(NotificationType type, String title, String message) {}
+
+    private static String nullToEmpty(String s) {
+        return s == null ? "" : s;
     }
 
     @Override

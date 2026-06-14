@@ -47,9 +47,11 @@ export class QuestionFormComponent implements OnInit {
   dupResult = signal<DuplicateCheckResponse | null>(null);
 
   isEdit = !!this.data.question;
-  canSubmitForReview = !this.isEdit ||
+  // A rejected question is terminal — permanently locked from edits (Story 1.3).
+  isLocked = this.isEdit && this.data.question?.status === 'REJECTED';
+  canSubmitForReview = !this.isLocked && (!this.isEdit ||
     this.data.question?.status === 'DRAFT' ||
-    this.data.question?.status === 'REJECTED';
+    this.data.question?.status === 'MODIFICATION_REQUESTED');
 
   readonly difficulties = [
     { value: 'EASY',   label: 'Easy',   classes: 'border-emerald-300 text-emerald-700 bg-emerald-50', activeClasses: 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/30' },
@@ -103,6 +105,8 @@ export class QuestionFormComponent implements OnInit {
       this.stacks.set(res.data);
       if (this.data.question?.stackId) this.loadTopics(this.data.question.stackId);
     });
+    // Terminal rejected questions are read-only: disable every control (Story 1.3).
+    if (this.isLocked) this.form.disable();
   }
 
   onStackChange(stackId: number): void {

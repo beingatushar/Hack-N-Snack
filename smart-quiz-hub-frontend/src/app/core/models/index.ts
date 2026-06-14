@@ -1,5 +1,11 @@
 export type UserRole = 'SME' | 'ADMIN';
-export type McqStatus = 'DRAFT' | 'READY_FOR_REVIEW' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
+export type McqStatus =
+  | 'DRAFT'
+  | 'READY_FOR_REVIEW'
+  | 'UNDER_REVIEW'
+  | 'MODIFICATION_REQUESTED'
+  | 'APPROVED'
+  | 'REJECTED';
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
 export interface ApiResponse<T> {
@@ -77,7 +83,7 @@ export interface McqRequest {
 }
 
 export interface ReviewRequest {
-  decision: 'APPROVED' | 'REJECTED';
+  decision: 'APPROVED' | 'REJECTED' | 'MODIFICATION_REQUESTED';
   comments?: string;
 }
 
@@ -185,6 +191,7 @@ export type NotificationType =
   | 'REVIEW_ASSIGNED'
   | 'QUESTION_APPROVED'
   | 'QUESTION_REJECTED'
+  | 'MODIFICATION_REQUESTED'
   | 'QUESTION_SUBMITTED';
 
 export interface AppNotification {
