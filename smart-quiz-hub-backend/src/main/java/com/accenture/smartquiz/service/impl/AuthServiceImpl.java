@@ -34,14 +34,14 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
-        rateLimiter.checkAllowed(request.getEnterpriseId());
+        rateLimiter.checkAllowed(request.enterpriseId());
 
         try {
             Authentication auth = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getEnterpriseId(), request.getPassword())
+                    new UsernamePasswordAuthenticationToken(request.enterpriseId(), request.password())
             );
 
-            rateLimiter.reset(request.getEnterpriseId());
+            rateLimiter.reset(request.enterpriseId());
 
             SmartQuizUserDetails userDetails = (SmartQuizUserDetails) auth.getPrincipal();
             String token = jwtTokenProvider.generateToken(userDetails);
@@ -62,7 +62,7 @@ public class AuthServiceImpl implements AuthService {
                     .build();
 
         } catch (BadCredentialsException ex) {
-            rateLimiter.recordFailure(request.getEnterpriseId());
+            rateLimiter.recordFailure(request.enterpriseId());
             log.warn("Failed login attempt (invalid credentials)");
             throw ex;
         }

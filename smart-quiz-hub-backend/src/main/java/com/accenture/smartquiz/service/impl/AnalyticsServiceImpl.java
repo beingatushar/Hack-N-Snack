@@ -1,52 +1,63 @@
 package com.accenture.smartquiz.service.impl;
 
 import com.accenture.smartquiz.dto.response.AnalyticsOverviewResponse;
+import com.accenture.smartquiz.dto.response.QuestionAnalyticsResponse;
 import com.accenture.smartquiz.dto.response.ReviewerWorkloadResponse;
+import com.accenture.smartquiz.dto.response.SmeReportResponse;
+import com.accenture.smartquiz.entity.User;
 import com.accenture.smartquiz.entity.enums.McqStatus;
+import com.accenture.smartquiz.entity.enums.UserRole;
 import com.accenture.smartquiz.repository.McqQuestionRepository;
+import com.accenture.smartquiz.repository.UserRepository;
 import com.accenture.smartquiz.service.AnalyticsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.Comparator;
 
 @Service
 @RequiredArgsConstructor
 public class AnalyticsServiceImpl implements AnalyticsService {
 
     private final McqQuestionRepository mcqRepo;
+    private final UserRepository userRepo;
+
+    /** Anything before this is "the beginning of time" for an open-ended lower bound. */
+    private static final Instant MIN = Instant.EPOCH;
+
+    private Instant startOrMin(Instant start) {
+        return start != null ? start : MIN;
+    }
+
+    private Instant endOrNow(Instant end) {
+        // exclusive upper bound; +1 day past now covers rows created during the request
+        return end != null ? end : Instant.now().plus(Duration.ofDays(1));
+    }
 
     @Override
     @Transactional(readOnly = true)
-    public AnalyticsOverviewResponse getOverview() {
-        // Status counts — enumerate every status so zeros show up in the chart
+    public AnalyticsOverviewResponse getOverview(Instant start, Instant end) {
+        Instant s = startOrMin(start);
+        Instant e = endOrNow(end);
+
+        // Status counts — seed every status with 0 so empty buckets still render
         Map<String, Long> byStatus = new LinkedHashMap<>();
-        Arrays.stream(McqStatus.values()).forEach(s ->
-                byStatus.put(s.name(), mcqRepo.countByStatus(s)));
+        Arrays.stream(McqStatus.values()).forEach(st -> byStatus.put(st.name(), 0L));
+        mcqRepo.countByStatusInRange(s, e)
+                .forEach(r -> byStatus.put(((McqStatus) r[0]).name(), ((Number) r[1]).longValue()));
 
-        // Stack counts from aggregate query
-        Map<String, Long> byStack = mcqRepo.countByStack().stream()
-                .collect(Collectors.toMap(
-                        r -> (String) r[0],
-                        r -> (Long) r[1],
-                        (a, b) -> a,
-                        LinkedHashMap::new));
+        Map<String, Long> byStack = toCountMap(mcqRepo.countByStackInRange(s, e));
+        Map<String, Long> byDifficulty = toCountMap(mcqRepo.countByDifficultyInRange(s, e));
 
-        // Difficulty counts
-        Map<String, Long> byDifficulty = mcqRepo.countByDifficulty().stream()
-                .collect(Collectors.toMap(
-                        r -> r[0].toString(),
-                        r -> (Long) r[1],
-                        (a, b) -> a,
-                        LinkedHashMap::new));
-
-        // Weekly trend
-        List<AnalyticsOverviewResponse.WeeklyCount> trend = mcqRepo.weeklyCreationTrend().stream()
+        List<AnalyticsOverviewResponse.WeeklyCount> trend = mcqRepo.weeklyCreationTrendInRange(s, e).stream()
                 .map(r -> AnalyticsOverviewResponse.WeeklyCount.builder()
                         .week(r[0].toString())
                         .count(((Number) r[1]).longValue())
@@ -63,6 +74,87 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<SmeReportResponse> getSmeReports(Instant start, Instant end) {
+        Instant s = startOrMin(start);
+        Instant e = endOrNow(end);
+
+        Map<Long, Long> authored = toIdCountMap(mcqRepo.authoredCountsByCreator(s, e));
+        Map<Long, Long> pending = toIdCountMap(mcqRepo.pendingCountsByReviewer());
+        Map<Long, Double> turnaroundSecs = new HashMap<>();
+        mcqRepo.avgTurnaroundSecondsByReviewer(s, e).forEach(r -> {
+            if (r[0] != null && r[1] != null) {
+                turnaroundSecs.put(((Number) r[0]).longValue(), ((Number) r[1]).doubleValue());
+            }
+        });
+
+        // reviewerId -> (status -> count)
+        Map<Long, Map<McqStatus, Long>> decisions = new HashMap<>();
+        mcqRepo.reviewDecisionCountsByReviewer(s, e).forEach(r -> decisions
+                .computeIfAbsent(((Number) r[0]).longValue(), k -> new HashMap<>())
+                .put((McqStatus) r[1], ((Number) r[2]).longValue()));
+
+        return userRepo.findByRoleAndActiveTrue(UserRole.SME).stream()
+                .map(sme -> buildSmeReport(sme, authored, pending, turnaroundSecs, decisions))
+                .sorted(Comparator
+                        .comparingLong(SmeReportResponse::reviewedCount).reversed()
+                        .thenComparing(Comparator.comparingLong(SmeReportResponse::authoredCount).reversed()))
+                .toList();
+    }
+
+    private SmeReportResponse buildSmeReport(User sme,
+                                             Map<Long, Long> authored,
+                                             Map<Long, Long> pending,
+                                             Map<Long, Double> turnaroundSecs,
+                                             Map<Long, Map<McqStatus, Long>> decisions) {
+        Long id = sme.getId();
+        Map<McqStatus, Long> byStatus = decisions.getOrDefault(id, Map.of());
+        long approved = byStatus.getOrDefault(McqStatus.APPROVED, 0L);
+        long rejected = byStatus.getOrDefault(McqStatus.REJECTED, 0L);
+        long modRequested = byStatus.getOrDefault(McqStatus.MODIFICATION_REQUESTED, 0L);
+        long reviewed = approved + rejected + modRequested;
+
+        double approvalRate = reviewed > 0 ? round1(approved * 100.0 / reviewed) : 0.0;
+        Double avgHours = turnaroundSecs.containsKey(id)
+                ? round1(turnaroundSecs.get(id) / 3600.0) : null;
+
+        return new SmeReportResponse(
+                id, sme.getFullName(),
+                authored.getOrDefault(id, 0L),
+                reviewed, approved, rejected, modRequested,
+                approvalRate, avgHours,
+                pending.getOrDefault(id, 0L));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public QuestionAnalyticsResponse getQuestionAnalytics(Instant start, Instant end) {
+        Instant s = startOrMin(start);
+        Instant e = endOrNow(end);
+
+        Map<String, Long> byStatus = new LinkedHashMap<>();
+        Arrays.stream(McqStatus.values()).forEach(st -> byStatus.put(st.name(), 0L));
+        mcqRepo.countByStatusInRange(s, e)
+                .forEach(r -> byStatus.put(((McqStatus) r[0]).name(), ((Number) r[1]).longValue()));
+
+        Map<String, Long> byStack = toCountMap(mcqRepo.countByStackInRange(s, e));
+        Map<String, Long> byDifficulty = toCountMap(mcqRepo.countByDifficultyInRange(s, e));
+
+        long total = byStatus.values().stream().mapToLong(Long::longValue).sum();
+        long approved = byStatus.getOrDefault(McqStatus.APPROVED.name(), 0L);
+        long rejected = byStatus.getOrDefault(McqStatus.REJECTED.name(), 0L);
+        long decided = approved + rejected;
+        double approvalRate = decided > 0 ? round1(approved * 100.0 / decided) : 0.0;
+
+        Double avgSim = mcqRepo.avgSimilarityInRange(s, e);
+        Double avgSimPercent = avgSim != null ? round1(avgSim * 100.0) : null;
+
+        return new QuestionAnalyticsResponse(
+                total, byStatus, byStack, byDifficulty,
+                approved, rejected, approvalRate, avgSimPercent);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<ReviewerWorkloadResponse> getReviewerWorkload() {
         return mcqRepo.reviewerWorkload().stream()
                 .map(r -> ReviewerWorkloadResponse.builder()
@@ -71,5 +163,27 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                         .build())
                 .sorted((a, b) -> Long.compare(b.getPendingCount(), a.getPendingCount()))
                 .toList();
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    private Map<String, Long> toCountMap(List<Object[]> rows) {
+        Map<String, Long> map = new LinkedHashMap<>();
+        rows.forEach(r -> map.put(r[0].toString(), ((Number) r[1]).longValue()));
+        return map;
+    }
+
+    private Map<Long, Long> toIdCountMap(List<Object[]> rows) {
+        Map<Long, Long> map = new HashMap<>();
+        rows.forEach(r -> {
+            if (r[0] != null) {
+                map.put(((Number) r[0]).longValue(), ((Number) r[1]).longValue());
+            }
+        });
+        return map;
+    }
+
+    private double round1(double v) {
+        return Math.round(v * 10.0) / 10.0;
     }
 }

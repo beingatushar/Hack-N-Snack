@@ -11,10 +11,11 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { FormsModule } from '@angular/forms';
-import { NgClass } from '@angular/common';
+import { DatePipe, NgClass } from '@angular/common';
 import { ReviewService } from '../../../core/services/review.service';
 import { SnackService } from '../../../core/services/snack.service';
 import { McqResponse } from '../../../core/models';
+import { RelativeTimePipe } from '../../../shared/pipes/relative-time.pipe';
 
 @Component({
   selector: 'app-pending-reviews',
@@ -24,7 +25,7 @@ import { McqResponse } from '../../../core/models';
     MatFormFieldModule, MatInputModule, MatSelectModule,
     MatPaginatorModule, MatProgressSpinnerModule,
     MatExpansionModule, MatTooltipModule,
-    FormsModule, NgClass
+    FormsModule, NgClass, DatePipe, RelativeTimePipe
   ],
   templateUrl: './pending-reviews.component.html',
   styleUrl: './pending-reviews.component.scss'

@@ -21,6 +21,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     List<User> findByRoleAndActiveTrue(UserRole role);
 
-    @Query("SELECT u FROM User u JOIN u.stackMappings sm WHERE sm.stack.id = :stackId AND u.active = true AND u.role = 'SME'")
+    @Query(name = "User.findSmesByStackId")
     List<User> findSmesByStackId(@Param("stackId") Long stackId);
 }

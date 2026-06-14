@@ -5,8 +5,16 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { forkJoin } from 'rxjs';
 import { AdminService } from '../../../core/services/admin.service';
-import { SmeUserResponse } from '../../../core/models';
+import { AnalyticsService } from '../../../core/services/analytics.service';
+import { SmeReport, SmeUserResponse } from '../../../core/models';
+
+/** Combines the SME roster (email, stacks) with their performance report (Story 2.1). */
+export interface SmeReportRow {
+  sme: SmeUserResponse;
+  report?: SmeReport;
+}
 
 @Component({
   selector: 'app-sme-management',
@@ -20,14 +28,52 @@ import { SmeUserResponse } from '../../../core/models';
 })
 export class SmeManagementComponent implements OnInit {
   private adminSvc = inject(AdminService);
+  private analyticsSvc = inject(AnalyticsService);
 
-  smes    = signal<SmeUserResponse[]>([]);
+  rows    = signal<SmeReportRow[]>([]);
   loading = signal(true);
 
+  startDate = signal<string | null>(null);
+  endDate   = signal<string | null>(null);
+
   ngOnInit(): void {
-    this.adminSvc.getAllSmes().subscribe({
-      next: res => { this.smes.set(res.data); this.loading.set(false); },
-      error: ()  => this.loading.set(false)
+    this.load();
+  }
+
+  load(): void {
+    this.loading.set(true);
+    const range = { startDate: this.startDate(), endDate: this.endDate() };
+    forkJoin({
+      smes: this.adminSvc.getAllSmes(),
+      reports: this.analyticsSvc.getSmeReports(range)
+    }).subscribe({
+      next: ({ smes, reports }) => {
+        const byId = new Map<number, SmeReport>(reports.map(r => [r.smeId, r]));
+        this.rows.set(smes.data.map(sme => ({ sme, report: byId.get(sme.id) })));
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false)
     });
+  }
+
+  applyRange(): void {
+    this.load();
+  }
+
+  resetRange(): void {
+    this.startDate.set(null);
+    this.endDate.set(null);
+    this.load();
+  }
+
+  get hasRange(): boolean {
+    return !!(this.startDate() || this.endDate());
+  }
+
+  turnaroundLabel(hours: number | null | undefined): string {
+    if (hours == null) return '—';
+    if (hours < 1) return Math.round(hours * 60) + 'm';
+    if (hours < 48) return Math.round(hours) + 'h';
+    return Math.round(hours / 24) + 'd';
   }
 }

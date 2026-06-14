@@ -94,8 +94,12 @@
                   {{ q.status.replaceAll('_', ' ') }}
                 </span>
               </td>
-              <td class="px-5 py-4 text-slate-400 text-xs whitespace-nowrap">
-                {{ q.updatedAt | date:'dd MMM yy' }}
+              <td class="px-5 py-4 whitespace-nowrap">
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-[11px] font-medium"
+                      [matTooltip]="'Created ' + (q.createdAt | date:'dd MMM yyyy, h:mm a') + ' · Updated ' + (q.updatedAt | date:'dd MMM yyyy, h:mm a')">
+                  <span class="material-icons text-[12px]">schedule</span>
+                  {{ q.updatedAt | relativeTime }}
+                </span>
               </td>
               <td class="px-5 py-4">
                 <div class="flex items-center gap-1">

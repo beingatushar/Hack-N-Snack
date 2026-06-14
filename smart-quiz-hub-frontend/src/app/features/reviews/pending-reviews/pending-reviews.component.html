@@ -42,7 +42,14 @@
               <span class="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold border border-indigo-100">{{ q.stackName }}</span>
               <span class="px-2.5 py-1 rounded-full bg-cyan-50 text-cyan-700 text-xs font-semibold border border-cyan-100">{{ q.topicName }}</span>
             </div>
-            <span class="status-badge under_review">Under Review</span>
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-[11px] font-medium"
+                    [matTooltip]="'Created ' + (q.createdAt | date:'dd MMM yyyy, h:mm a') + ' · Updated ' + (q.updatedAt | date:'dd MMM yyyy, h:mm a')">
+                <span class="material-icons text-[12px]">schedule</span>
+                {{ q.updatedAt | relativeTime }}
+              </span>
+              <span class="status-badge under_review">Under Review</span>
+            </div>
           </div>
 
           <!-- Question content -->

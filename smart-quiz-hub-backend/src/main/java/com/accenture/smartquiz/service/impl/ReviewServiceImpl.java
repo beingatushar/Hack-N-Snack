@@ -54,8 +54,8 @@ public class ReviewServiceImpl implements ReviewService {
                     "Reviewer can only be assigned to questions in READY_FOR_REVIEW or UNDER_REVIEW status");
         }
 
-        User reviewer = userRepo.findById(request.getReviewerId())
-                .orElseThrow(() -> new ResourceNotFoundException("User", request.getReviewerId()));
+        User reviewer = userRepo.findById(request.reviewerId())
+                .orElseThrow(() -> new ResourceNotFoundException("User", request.reviewerId()));
 
         if (reviewer.getId().equals(question.getCreator().getId())) {
             throw new UnauthorizedAccessException("Creator cannot review their own question");
@@ -90,13 +90,13 @@ public class ReviewServiceImpl implements ReviewService {
             throw new UnauthorizedAccessException("Only admins can assign reviewers");
         }
 
-        User reviewer = userRepo.findById(request.getReviewerId())
-                .orElseThrow(() -> new ResourceNotFoundException("User", request.getReviewerId()));
+        User reviewer = userRepo.findById(request.reviewerId())
+                .orElseThrow(() -> new ResourceNotFoundException("User", request.reviewerId()));
 
         int assigned = 0;
         List<String> skippedReasons = new ArrayList<>();
 
-        for (Long questionId : request.getQuestionIds()) {
+        for (Long questionId : request.questionIds()) {
             McqQuestion question = mcqRepo.findById(questionId).orElse(null);
             if (question == null) {
                 skippedReasons.add("Question " + questionId + ": not found");
@@ -163,7 +163,7 @@ public class ReviewServiceImpl implements ReviewService {
             question.setStatus(McqStatus.UNDER_REVIEW);
         }
 
-        McqStatus decision = request.getDecision();
+        McqStatus decision = request.decision();
         if (decision != McqStatus.APPROVED && decision != McqStatus.REJECTED
                 && decision != McqStatus.MODIFICATION_REQUESTED) {
             throw new InvalidStatusTransitionException(
@@ -171,7 +171,7 @@ public class ReviewServiceImpl implements ReviewService {
         }
         // Comments are mandatory for any decision that sends the question back to the creator.
         if ((decision == McqStatus.REJECTED || decision == McqStatus.MODIFICATION_REQUESTED)
-                && (request.getComments() == null || request.getComments().isBlank())) {
+                && (request.comments() == null || request.comments().isBlank())) {
             throw new IllegalArgumentException(
                     "Comments are mandatory when rejecting or requesting modifications");
         }
@@ -180,7 +180,7 @@ public class ReviewServiceImpl implements ReviewService {
         }
 
         question.setStatus(decision);
-        question.setReviewerComments(request.getComments());
+        question.setReviewerComments(request.comments());
         question.setReviewedAt(java.time.Instant.now());
 
         log.info("Question {} {} by reviewer {}", questionId, decision,
@@ -196,11 +196,11 @@ public class ReviewServiceImpl implements ReviewService {
             case REJECTED -> new ReviewOutcome(
                     NotificationType.QUESTION_REJECTED, "Question Rejected",
                     "Your question #" + questionId + " was rejected. Reviewer comments: "
-                            + nullToEmpty(request.getComments()));
+                            + nullToEmpty(request.comments()));
             case MODIFICATION_REQUESTED -> new ReviewOutcome(
                     NotificationType.MODIFICATION_REQUESTED, "Modifications Requested",
                     "Your question #" + questionId + " needs changes before approval. "
-                            + "Reviewer comments: " + nullToEmpty(request.getComments()));
+                            + "Reviewer comments: " + nullToEmpty(request.comments()));
             default -> throw new InvalidStatusTransitionException(
                     "Unsupported review decision: " + decision);
         };

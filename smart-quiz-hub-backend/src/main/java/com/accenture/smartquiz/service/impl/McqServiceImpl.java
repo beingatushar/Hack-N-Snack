@@ -61,17 +61,17 @@ public class McqServiceImpl implements McqService {
     @Override
     @Transactional
     public McqResponse createQuestion(McqRequest req, SmartQuizUserDetails currentUser) {
-        TechnologyStack stack = stackRepo.findById(req.getStackId())
-                .orElseThrow(() -> new ResourceNotFoundException("TechnologyStack", req.getStackId()));
-        Topic topic = topicRepo.findById(req.getTopicId())
-                .orElseThrow(() -> new ResourceNotFoundException("Topic", req.getTopicId()));
+        TechnologyStack stack = stackRepo.findById(req.stackId())
+                .orElseThrow(() -> new ResourceNotFoundException("TechnologyStack", req.stackId()));
+        Topic topic = topicRepo.findById(req.topicId())
+                .orElseThrow(() -> new ResourceNotFoundException("Topic", req.topicId()));
         User creator = userRepo.getReferenceById(currentUser.getUserId());
 
         McqQuestion question = McqQuestion.builder()
-                .questionStem(req.getQuestionStem())
-                .options(req.getOptions())
-                .correctOptionIndices(req.getCorrectOptionIndices())
-                .difficulty(req.getDifficulty())
+                .questionStem(req.questionStem())
+                .options(req.options())
+                .correctOptionIndices(req.correctOptionIndices())
+                .difficulty(req.difficulty())
                 .stack(stack)
                 .topic(topic)
                 .creator(creator)
@@ -87,15 +87,15 @@ public class McqServiceImpl implements McqService {
         McqQuestion question = findQuestionById(id);
         assertCanEdit(question, currentUser);
 
-        TechnologyStack stack = stackRepo.findById(req.getStackId())
-                .orElseThrow(() -> new ResourceNotFoundException("TechnologyStack", req.getStackId()));
-        Topic topic = topicRepo.findById(req.getTopicId())
-                .orElseThrow(() -> new ResourceNotFoundException("Topic", req.getTopicId()));
+        TechnologyStack stack = stackRepo.findById(req.stackId())
+                .orElseThrow(() -> new ResourceNotFoundException("TechnologyStack", req.stackId()));
+        Topic topic = topicRepo.findById(req.topicId())
+                .orElseThrow(() -> new ResourceNotFoundException("Topic", req.topicId()));
 
-        question.setQuestionStem(req.getQuestionStem());
-        question.setOptions(req.getOptions());
-        question.setCorrectOptionIndices(req.getCorrectOptionIndices());
-        question.setDifficulty(req.getDifficulty());
+        question.setQuestionStem(req.questionStem());
+        question.setOptions(req.options());
+        question.setCorrectOptionIndices(req.correctOptionIndices());
+        question.setDifficulty(req.difficulty());
         question.setStack(stack);
         question.setTopic(topic);
 
@@ -279,8 +279,8 @@ public class McqServiceImpl implements McqService {
     @Transactional(readOnly = true)
     public DuplicateCheckResponse checkDuplicate(DuplicateCheckRequest req) {
         SimilarityOutcome outcome = similarityService.analyze(
-                req.getStackId(), req.getTopicId(),
-                req.getQuestionStem(), req.getOptions(), req.getExcludeId());
+                req.stackId(), req.topicId(),
+                req.questionStem(), req.options(), req.excludeId());
 
         double threshold = similarityService.threshold();
         boolean duplicate = outcome.maxScore() >= threshold;

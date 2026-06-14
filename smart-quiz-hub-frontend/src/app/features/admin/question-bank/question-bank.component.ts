@@ -6,6 +6,7 @@ import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatInputModule } from '@angular/material/input';
 import { DatePipe, NgClass } from '@angular/common';
+import { RelativeTimePipe } from '../../../shared/pipes/relative-time.pipe';
 import { McqService } from '../../../core/services/mcq.service';
 import { ReviewService } from '../../../core/services/review.service';
 import { AdminService } from '../../../core/services/admin.service';
@@ -22,7 +23,7 @@ import { QuestionFormComponent } from '../../questions/question-form/question-fo
   imports: [
     MatButtonModule, MatIconModule, MatDialogModule, MatTooltipModule,
     MatInputModule, FormsModule,
-    DatePipe, NgClass
+    DatePipe, NgClass, RelativeTimePipe
   ],
   templateUrl: './question-bank.component.html',
   styleUrl: './question-bank.component.scss'

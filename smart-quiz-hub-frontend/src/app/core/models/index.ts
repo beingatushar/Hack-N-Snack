@@ -222,3 +222,35 @@ export interface ReviewerWorkload {
   reviewerName: string;
   pendingCount: number;
 }
+
+/** Optional ISO date (yyyy-MM-dd) bounds for analytics queries. */
+export interface AnalyticsDateRange {
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+/** Per-SME performance report (Story 2.1). */
+export interface SmeReport {
+  smeId: number;
+  smeName: string;
+  authoredCount: number;
+  reviewedCount: number;
+  approvedCount: number;
+  rejectedCount: number;
+  modificationRequestedCount: number;
+  approvalRate: number;
+  avgTurnaroundHours: number | null;
+  pendingCount: number;
+}
+
+/** Question-performance analytics over a date range (Story 2.2). */
+export interface QuestionAnalytics {
+  total: number;
+  byStatus: Record<string, number>;
+  byStack: Record<string, number>;
+  byDifficulty: Record<string, number>;
+  approvedCount: number;
+  rejectedCount: number;
+  approvalRate: number;
+  avgSimilarityPercent: number | null;
+}

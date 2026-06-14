@@ -1,16 +1,35 @@
 <div class="animate-fade-up">
 
   <!-- Header -->
-  <div class="flex items-center justify-between mb-8">
+  <div class="flex flex-wrap items-end justify-between gap-4 mb-8">
     <div>
-      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">SME Management</h1>
-      <p class="text-slate-500 text-sm mt-1">Subject Matter Experts and their contributions</p>
+      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">SME Reports</h1>
+      <p class="text-slate-500 text-sm mt-1">Subject Matter Expert contributions &amp; review performance</p>
     </div>
-    @if (smes().length > 0) {
-      <span class="text-sm text-slate-500 bg-white border border-slate-200 px-4 py-2 rounded-xl font-semibold">
-        {{ smes().length }} active SMEs
-      </span>
-    }
+
+    <!-- Date-range filter (Story 2.3) — scopes review/turnaround metrics -->
+    <div class="flex items-end gap-2 bg-white border border-slate-200 rounded-2xl px-4 py-3 shadow-sm">
+      <div class="flex flex-col">
+        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">From</label>
+        <input type="date" [value]="startDate() ?? ''" (change)="startDate.set($any($event.target).value || null)"
+               class="h-9 px-2 border border-slate-200 rounded-lg text-sm text-slate-700 outline-none focus:border-indigo-500" />
+      </div>
+      <div class="flex flex-col">
+        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">To</label>
+        <input type="date" [value]="endDate() ?? ''" (change)="endDate.set($any($event.target).value || null)"
+               class="h-9 px-2 border border-slate-200 rounded-lg text-sm text-slate-700 outline-none focus:border-indigo-500" />
+      </div>
+      <button (click)="applyRange()"
+              class="h-9 px-4 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold shadow-sm hover:-translate-y-0.5 transition-all">
+        Apply
+      </button>
+      @if (hasRange) {
+        <button (click)="resetRange()"
+                class="h-9 px-3 rounded-lg border border-slate-200 text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-all">
+          Reset
+        </button>
+      }
+    </div>
   </div>
 
   @if (loading()) {
@@ -22,24 +41,24 @@
     </div>
   } @else {
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-      @for (sme of smes(); track sme.id) {
+      @for (row of rows(); track row.sme.id) {
         <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/60 transition-all duration-200">
 
           <!-- Header -->
           <div class="flex items-center gap-4 px-5 py-5 border-b border-slate-100">
             <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-lg shadow-indigo-500/25">
-              {{ sme.fullName.charAt(0) }}
+              {{ row.sme.fullName.charAt(0) }}
             </div>
             <div class="flex-1 min-w-0">
-              <p class="font-bold text-slate-900 text-sm truncate">{{ sme.fullName }}</p>
-              <p class="text-slate-400 text-xs mt-0.5">{{ sme.enterpriseId }}</p>
+              <p class="font-bold text-slate-900 text-sm truncate">{{ row.sme.fullName }}</p>
+              <p class="text-slate-400 text-xs mt-0.5">{{ row.sme.enterpriseId }}</p>
             </div>
-            <div class="flex items-center gap-1.5" [title]="sme.active ? 'Active' : 'Inactive'">
-              <span class="w-2 h-2 rounded-full" [class]="sme.active ? 'bg-emerald-400 shadow-emerald-400/50 shadow-sm' : 'bg-slate-300'"></span>
-              <span class="text-xs" [class]="sme.active ? 'text-emerald-600' : 'text-slate-400'">
-                {{ sme.active ? 'Active' : 'Inactive' }}
+            @if ((row.report?.pendingCount ?? 0) > 0) {
+              <span class="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-[11px] font-bold border border-amber-200"
+                    matTooltip="Currently assigned & under review">
+                {{ row.report?.pendingCount }} in queue
               </span>
-            </div>
+            }
           </div>
 
           <!-- Body -->
@@ -48,13 +67,13 @@
             <!-- Email -->
             <div class="flex items-center gap-2 text-xs text-slate-400">
               <span class="material-icons text-[14px]">email</span>
-              <span class="truncate">{{ sme.email }}</span>
+              <span class="truncate">{{ row.sme.email }}</span>
             </div>
 
             <!-- Stacks -->
-            @if ((sme.stacks?.length ?? 0) > 0) {
+            @if ((row.sme.stacks?.length ?? 0) > 0) {
               <div class="flex flex-wrap gap-1.5">
-                @for (stack of sme.stacks; track stack.id) {
+                @for (stack of row.sme.stacks; track stack.id) {
                   <span class="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-semibold border border-indigo-100">
                     {{ stack.stackName }}
                   </span>
@@ -62,21 +81,24 @@
               </div>
             }
 
-            <!-- Stats -->
-            <div class="grid grid-cols-3 gap-3 pt-2 border-t border-slate-100">
-              <div class="text-center">
-                <p class="text-xl font-extrabold text-indigo-600 tracking-tight">{{ sme.totalQuestions }}</p>
-                <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">Total</p>
+            <!-- Performance metrics (Story 2.1) -->
+            <div class="grid grid-cols-4 gap-2 pt-2 border-t border-slate-100">
+              <div class="text-center" matTooltip="Questions authored">
+                <p class="text-lg font-extrabold text-indigo-600 tracking-tight">{{ row.report?.authoredCount ?? 0 }}</p>
+                <p class="text-[9px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">Authored</p>
               </div>
-              <div class="text-center border-x border-slate-100">
-                <p class="text-xl font-extrabold text-emerald-600 tracking-tight">{{ sme.approvedQuestions }}</p>
-                <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">Approved</p>
+              <div class="text-center border-l border-slate-100" matTooltip="Review decisions made">
+                <p class="text-lg font-extrabold text-slate-700 tracking-tight">{{ row.report?.reviewedCount ?? 0 }}</p>
+                <p class="text-[9px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">Reviewed</p>
               </div>
-              <div class="text-center">
-                <p class="text-xl font-extrabold text-slate-700 tracking-tight">
-                  {{ sme.totalQuestions > 0 ? ((sme.approvedQuestions / sme.totalQuestions) * 100).toFixed(0) + '%' : '—' }}
-                </p>
-                <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">Rate</p>
+              <div class="text-center border-l border-slate-100"
+                   [matTooltip]="(row.report?.approvedCount ?? 0) + ' approved · ' + (row.report?.rejectedCount ?? 0) + ' rejected'">
+                <p class="text-lg font-extrabold text-emerald-600 tracking-tight">{{ row.report?.approvalRate ?? 0 }}%</p>
+                <p class="text-[9px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">Approval</p>
+              </div>
+              <div class="text-center border-l border-slate-100" matTooltip="Average review turnaround (submission → decision)">
+                <p class="text-lg font-extrabold text-violet-600 tracking-tight">{{ turnaroundLabel(row.report?.avgTurnaroundHours) }}</p>
+                <p class="text-[9px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">Turnaround</p>
               </div>
             </div>
 

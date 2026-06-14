@@ -86,13 +86,13 @@ public class AiQuestionServiceImpl implements AiQuestionService {
     @Override
     @Transactional
     public List<McqResponse> generateQuestions(AiGenerateRequest request, SmartQuizUserDetails currentUser) {
-        TechnologyStack stack = stackRepo.findById(request.getStackId())
-                .orElseThrow(() -> new ResourceNotFoundException("TechnologyStack", request.getStackId()));
-        Topic topic = topicRepo.findById(request.getTopicId())
-                .orElseThrow(() -> new ResourceNotFoundException("Topic", request.getTopicId()));
+        TechnologyStack stack = stackRepo.findById(request.stackId())
+                .orElseThrow(() -> new ResourceNotFoundException("TechnologyStack", request.stackId()));
+        Topic topic = topicRepo.findById(request.topicId())
+                .orElseThrow(() -> new ResourceNotFoundException("Topic", request.topicId()));
         User creator = userRepo.getReferenceById(currentUser.getUserId());
 
-        final int target = Math.max(1, request.getCount());
+        final int target = Math.max(1, request.count());
         final double threshold = similarityService.threshold();
 
         List<McqQuestion> accepted = new ArrayList<>(target);
@@ -112,7 +112,7 @@ public class AiQuestionServiceImpl implements AiQuestionService {
                     aiCalls++;
                     List<Map<String, Object>> batch = callAi(buildPrompt(
                             stack.getStackName(), topic.getTopicName(),
-                            request.getDifficulty().name(), request.getTopicContext(), need));
+                            request.difficulty().name(), request.topicContext(), need));
                     if (batch.isEmpty()) {
                         log.info("AI chat returned no candidates - using local fallback generator");
                         pool.addAll(fallbackCandidates(stack.getStackName(), topic.getTopicName(),
@@ -134,7 +134,7 @@ public class AiQuestionServiceImpl implements AiQuestionService {
                 continue;
             }
 
-            McqQuestion candidate = toCandidate(cand, stack, topic, creator, request.getDifficulty());
+            McqQuestion candidate = toCandidate(cand, stack, topic, creator, request.difficulty());
             if (candidate == null) {
                 continue; // malformed candidate - skip
             }

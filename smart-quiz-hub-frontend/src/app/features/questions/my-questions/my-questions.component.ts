@@ -15,6 +15,7 @@ import { DatePipe, NgClass } from '@angular/common';
 import { McqService } from '../../../core/services/mcq.service';
 import { SnackService } from '../../../core/services/snack.service';
 import { McqResponse, McqStatus } from '../../../core/models';
+import { RelativeTimePipe } from '../../../shared/pipes/relative-time.pipe';
 import {
   QuestionFormComponent
 } from '../question-form/question-form.component';
@@ -27,7 +28,7 @@ import { AiGenerateDialogComponent } from '../ai-generate-dialog/ai-generate-dia
     MatTableModule, MatPaginatorModule, MatButtonModule, MatIconModule, MatMenuModule,
     MatSelectModule, MatFormFieldModule, MatDialogModule,
     MatProgressSpinnerModule, MatChipsModule, MatTooltipModule,
-    DatePipe, NgClass
+    DatePipe, NgClass, RelativeTimePipe
   ],
   templateUrl: './my-questions.component.html',
   styleUrl: './my-questions.component.scss'

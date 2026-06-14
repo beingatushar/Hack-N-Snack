@@ -5,7 +5,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { Chart, registerables } from 'chart.js';
 import { AnalyticsService } from '../../core/services/analytics.service';
-import { AnalyticsOverview, ReviewerWorkload } from '../../core/models';
+import { AnalyticsOverview, QuestionAnalytics, ReviewerWorkload } from '../../core/models';
 
 Chart.register(...registerables);
 
@@ -25,8 +25,12 @@ export class AnalyticsComponent implements OnInit, AfterViewChecked, OnDestroy {
   @ViewChild('trendChart')      trendCanvasRef?:      ElementRef<HTMLCanvasElement>;
 
   overview  = signal<AnalyticsOverview | null>(null);
+  questionAnalytics = signal<QuestionAnalytics | null>(null);
   workload  = signal<ReviewerWorkload[]>([]);
   loading   = signal(true);
+
+  startDate = signal<string | null>(null);
+  endDate   = signal<string | null>(null);
 
   protected readonly Math = Math;
 
@@ -34,27 +38,51 @@ export class AnalyticsComponent implements OnInit, AfterViewChecked, OnDestroy {
   private chartsBuilt = false;
 
   private readonly STATUS_COLORS: Record<string, string> = {
-    DRAFT:             '#94a3b8',
-    READY_FOR_REVIEW:  '#60a5fa',
-    UNDER_REVIEW:      '#fbbf24',
-    APPROVED:          '#34d399',
-    REJECTED:          '#f87171'
+    DRAFT:                  '#94a3b8',
+    READY_FOR_REVIEW:       '#60a5fa',
+    UNDER_REVIEW:           '#fbbf24',
+    MODIFICATION_REQUESTED: '#a78bfa',
+    APPROVED:               '#34d399',
+    REJECTED:               '#f87171'
   };
 
   ngOnInit(): void {
+    this.load();
+  }
+
+  private load(): void {
+    this.loading.set(true);
+    const range = { startDate: this.startDate(), endDate: this.endDate() };
+
     let overviewDone = false;
+    let questionsDone = false;
     let workloadDone = false;
 
     const checkDone = () => {
-      if (overviewDone && workloadDone) {
+      if (overviewDone && questionsDone && workloadDone) {
         this.loading.set(false);
-        this.chartsBuilt = false; // reset so AfterViewChecked will build them
+        this.chartsBuilt = false; // reset so AfterViewChecked will rebuild them
         this.cdr.detectChanges();
       }
     };
 
-    this.analyticsSvc.getOverview().subscribe(d => { this.overview.set(d); overviewDone = true; checkDone(); });
+    this.analyticsSvc.getOverview(range).subscribe(d => { this.overview.set(d); overviewDone = true; checkDone(); });
+    this.analyticsSvc.getQuestionAnalytics(range).subscribe(d => { this.questionAnalytics.set(d); questionsDone = true; checkDone(); });
     this.analyticsSvc.getReviewerWorkload().subscribe(d => { this.workload.set(d); workloadDone = true; checkDone(); });
+  }
+
+  applyRange(): void {
+    this.load();
+  }
+
+  resetRange(): void {
+    this.startDate.set(null);
+    this.endDate.set(null);
+    this.load();
+  }
+
+  get hasRange(): boolean {
+    return !!(this.startDate() || this.endDate());
   }
 
   ngAfterViewChecked(): void {

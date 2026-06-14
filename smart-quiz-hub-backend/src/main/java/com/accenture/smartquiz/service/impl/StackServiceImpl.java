@@ -54,12 +54,12 @@ public class StackServiceImpl implements StackService {
     @Override
     @Transactional
     public StackDetailResponse createStack(StackRequest request) {
-        if (stackRepository.existsByStackNameIgnoreCase(request.getStackName())) {
-            throw new IllegalArgumentException("Stack '" + request.getStackName() + "' already exists");
+        if (stackRepository.existsByStackNameIgnoreCase(request.stackName())) {
+            throw new IllegalArgumentException("Stack '" + request.stackName() + "' already exists");
         }
         TechnologyStack stack = TechnologyStack.builder()
-                .stackName(request.getStackName())
-                .description(request.getDescription())
+                .stackName(request.stackName())
+                .description(request.description())
                 .active(true)
                 .build();
         return toStackDetail(stackRepository.save(stack));
@@ -70,12 +70,12 @@ public class StackServiceImpl implements StackService {
     public StackDetailResponse updateStack(Long id, StackRequest request) {
         TechnologyStack stack = stackRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("TechnologyStack", id));
-        boolean nameChanged = !stack.getStackName().equalsIgnoreCase(request.getStackName());
-        if (nameChanged && stackRepository.existsByStackNameIgnoreCase(request.getStackName())) {
-            throw new IllegalArgumentException("Stack '" + request.getStackName() + "' already exists");
+        boolean nameChanged = !stack.getStackName().equalsIgnoreCase(request.stackName());
+        if (nameChanged && stackRepository.existsByStackNameIgnoreCase(request.stackName())) {
+            throw new IllegalArgumentException("Stack '" + request.stackName() + "' already exists");
         }
-        stack.setStackName(request.getStackName());
-        stack.setDescription(request.getDescription());
+        stack.setStackName(request.stackName());
+        stack.setDescription(request.description());
         return toStackDetail(stackRepository.save(stack));
     }
 
@@ -93,12 +93,12 @@ public class StackServiceImpl implements StackService {
     public TopicDetailResponse addTopic(Long stackId, TopicRequest request) {
         TechnologyStack stack = stackRepository.findById(stackId)
                 .orElseThrow(() -> new ResourceNotFoundException("TechnologyStack", stackId));
-        if (topicRepository.existsByStackIdAndTopicNameIgnoreCase(stackId, request.getTopicName())) {
-            throw new IllegalArgumentException("Topic '" + request.getTopicName() + "' already exists in this stack");
+        if (topicRepository.existsByStackIdAndTopicNameIgnoreCase(stackId, request.topicName())) {
+            throw new IllegalArgumentException("Topic '" + request.topicName() + "' already exists in this stack");
         }
         Topic topic = Topic.builder()
                 .stack(stack)
-                .topicName(request.getTopicName())
+                .topicName(request.topicName())
                 .active(true)
                 .build();
         return toTopicDetail(topicRepository.save(topic));
@@ -112,11 +112,11 @@ public class StackServiceImpl implements StackService {
         }
         Topic topic = topicRepository.findById(topicId)
                 .orElseThrow(() -> new ResourceNotFoundException("Topic", topicId));
-        boolean nameChanged = !topic.getTopicName().equalsIgnoreCase(request.getTopicName());
-        if (nameChanged && topicRepository.existsByStackIdAndTopicNameIgnoreCase(stackId, request.getTopicName())) {
-            throw new IllegalArgumentException("Topic '" + request.getTopicName() + "' already exists in this stack");
+        boolean nameChanged = !topic.getTopicName().equalsIgnoreCase(request.topicName());
+        if (nameChanged && topicRepository.existsByStackIdAndTopicNameIgnoreCase(stackId, request.topicName())) {
+            throw new IllegalArgumentException("Topic '" + request.topicName() + "' already exists in this stack");
         }
-        topic.setTopicName(request.getTopicName());
+        topic.setTopicName(request.topicName());
         return toTopicDetail(topicRepository.save(topic));
     }
 
