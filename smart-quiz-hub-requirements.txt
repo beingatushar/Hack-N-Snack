@@ -1,0 +1,66 @@
+================================================================================
+TITLE: Smart Quiz Hub - Phase 2 Architecture & Feature Requirements Document
+================================================================================
+
+--------------------------------------------------------------------------------
+BRIEF DESCRIPTION
+--------------------------------------------------------------------------------
+This document outlines the Phase 2 evolution of the Smart Quiz Hub. The core
+focus is on introducing a strict, state-driven workflow for question moderation,
+expanding the platform's analytical capabilities, and modernizing the underlying
+technology stack. Key deliverables include locking edit permissions to creators,
+implementing an Approve/Reject/Suggest review cycle with a terminal "Rejected"
+state, introducing time-series parameter-based reporting for SMEs and Admins,
+and heavily leveraging Java 21 language features (Records, Pattern Matching)
+for a highly maintainable, scalable backend.
+
+--------------------------------------------------------------------------------
+LENGTHY DESCRIPTION & IMPLEMENTATION STRATEGY
+--------------------------------------------------------------------------------
+
+1. QUESTION LIFECYCLE & SECURITY
+The current application allows broad edit access and a simple status toggle. This
+phase introduces a strict State Machine Governance model.
+- Ownership Constraint: The backend will validate the `creatorId` against the JWT
+  principal for all write operations.
+- Review Workflow: Questions will move through a defined lifecycle:
+  DRAFT -> PENDING_REVIEW -> (MODIFICATION_REQUESTED | APPROVED | REJECTED).
+- Iterative Feedback: If a Reviewer selects 'Suggest Modifications', a comment
+  payload is attached to the entity, triggering a notification to the creator.
+  The creator edits the question, which resets the state to PENDING_REVIEW.
+- Terminal Rejection: If a question is REJECTED, it triggers an immutable state
+  lock. The application must throw specific exceptions (e.g.,
+  `InvalidStatusTransitionException`) if updates are attempted on terminal records.
+
+2. ANALYTICS & REPORTING ARCHITECTURE
+Moving from simple data grids to insight-driven dashboards requires new data
+aggregation strategies.
+- SME Reports: Transition from "SME Management" to a performance-oriented view.
+  Metrics will include review velocity, backlog size, and approval rates per SME.
+- Question Analytics: New dimensions will be introduced to track question
+  viability, including success rates and utilization frequency across the platform.
+- Timeline Filtering Engine: A universal filtering standard will be applied to all
+  analytics endpoints. Endpoints will accept ISO-8601 `startDate` and `endDate`
+  parameters. The database layer will utilize dynamic specification builders
+  (e.g., Spring Data JPA Specifications) to apply these filters efficiently.
+
+3. FRONTEND UI/UX ENHANCEMENTS
+To surface the new audit trail data without cluttering the interface, the
+frontend will adopt a clean, high-contrast design language.
+- Timestamps (`createdAt`, `updatedAt`) will be integrated into table views and
+  detail cards using modern, rounded UI components and solid brand colors.
+- Relative time formatting (e.g., "Updated 2 hrs ago") will be used for rapid
+  scanning, backed by exact datetime tooltips.
+
+4. BACKEND MODERNIZATION (JAVA 21)
+To ensure the codebase is positioned as a modern, production-ready enterprise
+application, we will aggressively adopt Java 21 features:
+- Data Carriers: All existing and new Request/Response DTOs will be converted
+  from standard POJOs (using Lombok @Data) to native Java `record` classes,
+  ensuring immutability and reducing memory overhead.
+- Pattern Matching: Complex conditional logic, specifically inside the `ReviewService`
+  and `NotificationService`, will be refactored to use Pattern Matching for switch
+  expressions, eliminating boilerplate casting and improving readability.
+- Concurrency: Spring Boot 3.2+ virtual threads will be enabled to effortlessly
+  scale the concurrent processing of AI question generation and bulk imports.
+================================================================================

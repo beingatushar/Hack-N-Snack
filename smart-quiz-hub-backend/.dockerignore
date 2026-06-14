@@ -1,0 +1,16 @@
+# Exclude compiled output — rebuilt inside the container
+target/
+
+# Git and IDE metadata
+.git/
+.idea/
+.vscode/
+*.iml
+
+# Logs
+logs/
+*.log
+
+# OS noise
+.DS_Store
+Thumbs.db

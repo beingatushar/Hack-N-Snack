@@ -1,37 +1,133 @@
-# Smart Quiz AI Hub — one-command, fully self-contained stack.
+# =============================================================
+# Smart Quiz Hub — Docker Compose (Development)
+# =============================================================
 #
-#   docker compose up --build        # build + start everything
-#   open http://localhost:4200       # (or whatever APP_PORT you set)
+# Quick start
+# -----------
+#   1. cp .env.example .env          # copy and fill in your API key
+#   2. docker compose up --build     # first run: builds images + starts all 3 containers
+#   3. docker compose up             # subsequent runs (images already built)
 #
-# All settings live in the `.env` file next to this one — edit that, never this
-# file. Every value below has a sensible default, so it also runs with no .env.
-# Everything (PostgreSQL + Spring Boot + Angular) runs in a single image, fully
-# offline. The UI and API are served from the same port via an internal proxy,
-# so changing APP_PORT is safe (no CORS / URL tweaks needed).
-services:
-  smart-quiz-hub:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: smart-quiz-hub:latest
-    container_name: smart-quiz-hub
-    ports:
-      # Left side = port on YOUR machine (change APP_PORT in .env). Open this in the browser.
-      - "${APP_PORT:-4200}:4200"
-    environment:
-      # ── AI (optional) — leave OPENAI_API_KEY blank to run offline ──────────
-      OPENAI_API_KEY: "${OPENAI_API_KEY:-dummy-key-replace-in-prod}"
-      AI_SIMILARITY_THRESHOLD: "${AI_SIMILARITY_THRESHOLD:-0.30}"
-      AI_EMBEDDINGS_ENABLED: "${AI_EMBEDDINGS_ENABLED:-true}"
-      AI_EMBEDDING_FLOOR: "${AI_EMBEDDING_FLOOR:-0.50}"
-      # ── Security ───────────────────────────────────────────────────────────
-      JWT_SECRET: "${JWT_SECRET:-${JWT_SECRET}}"
-      JWT_EXPIRATION_MS: "${JWT_EXPIRATION_MS:-86400000}"
-      # ── Database (internal; only applied on a fresh DB, see .env) ───────────
-      DB_PASSWORD: "${DB_PASSWORD:-root}"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
+# Services
+# --------
+#   postgres  → localhost:5432
+#   backend   → localhost:8080  (Swagger UI: http://localhost:8080/api/swagger-ui.html)
+#   frontend  → localhost:4200
+#
+# Hot reload
+# ----------
+#   Frontend  : Angular HMR — save any .ts/.html/.scss file and the browser reloads instantly.
+#   Backend   : Spring Boot DevTools — when your IDE auto-compiles a changed .java file,
+#               the app restarts in ~2-3 s without rebuilding the image.
+#               Enable auto-compile:
+#                 IntelliJ → Settings → Build → Compiler → "Build project automatically"
+#                 VS Code  → Java: Auto Build  (Ctrl+Shift+P → "Java: Rebuild Project")
+#
+# Useful commands
+# ---------------
+#   docker compose logs -f backend        # tail backend logs
+#   docker compose logs -f frontend       # tail frontend logs
+#   docker compose exec backend bash      # shell into backend container
+#   docker compose exec postgres psql -U postgres smart_quiz_hub
+#   docker compose down                   # stop all containers (data persists in volume)
+#   docker compose down -v                # stop + wipe the postgres volume (fresh DB)
+#   docker compose build backend          # rebuild backend image (after pom.xml change)
+#   docker compose build frontend         # rebuild frontend image (after package.json change)
+# =============================================================
 
+name: smart-quiz-hub
+
+services:
+
+  # ── PostgreSQL 16 ─────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: sqh-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sqh-net
+
+  # ── Spring Boot Backend ───────────────────────────────────
+  backend:
+    build:
+      context: ./smart-quiz-hub-backend
+      dockerfile: Dockerfile
+    container_name: sqh-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # DB — uses the 'postgres' service hostname inside Docker network
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      # Auth
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
+      # AI
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.groq.com/openai}
+      OPENAI_MODEL: ${OPENAI_MODEL:-llama-3.3-70b-versatile}
+      AI_SIMILARITY_THRESHOLD: ${AI_SIMILARITY_THRESHOLD:-0.30}
+      AI_EMBEDDINGS_ENABLED: ${AI_EMBEDDINGS_ENABLED:-true}
+      AI_EMBEDDING_FLOOR: ${AI_EMBEDDING_FLOOR:-0.50}
+      # CORS
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4200}
+      # Devtools restart trigger (forces classpath scan)
+      SPRING_DEVTOOLS_RESTART_ENABLED: "true"
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      # Mount source for hot reload — IDE-compiled .class files trigger DevTools restart
+      - ./smart-quiz-hub-backend:/app
+      # Persist Maven local repo so deps survive container restarts
+      - maven_cache:/root/.m2
+    networks:
+      - sqh-net
+
+  # ── Angular Frontend ──────────────────────────────────────
+  frontend:
+    build:
+      context: ./smart-quiz-hub-frontend
+      dockerfile: Dockerfile
+    container_name: sqh-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      # Used by proxy.conf.js to forward /api requests to the backend
+      # via the internal Docker network (not via the host's localhost)
+      BACKEND_URL: ${BACKEND_URL:-http://backend:8080}
+    ports:
+      - "${FRONTEND_PORT:-4200}:4200"
+    volumes:
+      # Mount source for HMR — file saves are detected and the browser refreshes
+      - ./smart-quiz-hub-frontend:/app
+      # Preserve node_modules from the image (don't let the bind-mount overwrite it)
+      - /app/node_modules
+    networks:
+      - sqh-net
+
+# ── Named Volumes ─────────────────────────────────────────
 volumes:
-  pgdata:
+  postgres_data:   # PostgreSQL data — survives container restarts
+  maven_cache:     # Maven ~/.m2 cache — avoids re-downloading all jars on each restart
+
+# ── Internal Network ──────────────────────────────────────
+networks:
+  sqh-net:
+    driver: bridge

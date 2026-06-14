@@ -9,11 +9,11 @@ server:
 spring:
   application:
     name: smart-quiz-ai-hub
-  # SECURITY: Set DB_USERNAME and DB_PASSWORD env vars in production. Never use default 'root'.
+  # DB_PASSWORD is required — no default. Set it in .env or as an environment variable.
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/smart_quiz_hub}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:root}
+    password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
@@ -47,7 +47,7 @@ spring:
       # Set OPENAI_API_KEY to your Groq key (starts with gsk_). Spring AI calls {base-url}/v1/chat/completions.
       # For real OpenAI instead: OPENAI_BASE_URL=https://api.openai.com, OPENAI_API_KEY=sk-..., OPENAI_MODEL=gpt-4o-mini
       base-url: ${OPENAI_BASE_URL:https://api.groq.com/openai}
-      api-key: ${OPENAI_API_KEY:${OPENAI_API_KEY}}
+      api-key: ${OPENAI_API_KEY}
       chat:
         options:
           model: ${OPENAI_MODEL:llama-3.3-70b-versatile}
@@ -68,17 +68,16 @@ spring:
 # ─────────────────────────────────────────────────────────────
 app:
   cors:
-    allowed-origins: http://localhost:4200
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
   ai:
     similarity:
       threshold: ${AI_SIMILARITY_THRESHOLD:0.30}
       embeddings-enabled: ${AI_EMBEDDINGS_ENABLED:true}
       embedding-floor: ${AI_EMBEDDING_FLOOR:0.50}
 
-# SECURITY: Override JWT_SECRET env var with a cryptographically random 256-bit key in production.
-# Never use the default value outside of local development.
+# JWT_SECRET is required — no default. Generate one with: openssl rand -base64 48
 jwt:
-  secret: ${JWT_SECRET:${JWT_SECRET}}
+  secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
 

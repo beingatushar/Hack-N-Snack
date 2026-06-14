@@ -1,0 +1,15 @@
+# node_modules is installed fresh inside the image
+node_modules/
+
+# Build output — not needed in dev container
+dist/
+.angular/
+
+# Git and IDE metadata
+.git/
+.idea/
+.vscode/
+
+# OS noise
+.DS_Store
+Thumbs.db
