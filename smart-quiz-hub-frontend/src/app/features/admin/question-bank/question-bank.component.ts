@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -6,19 +6,20 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatInputModule } from '@angular/material/input';
-import { DatePipe, NgClass } from '@angular/common';
+import { DatePipe } from '@angular/common';
+import { Subject, Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
 import { RelativeTimePipe } from '../../../shared/pipes/relative-time.pipe';
 import { TableHeaderCellComponent } from '../../../shared/components/table-header-cell/table-header-cell.component';
 import { ButtonDirective } from '../../../shared/components/button/button.directive';
-import { applyFilters, applySort, distinctOptions, SortState } from '../../../shared/utils/table-ops';
-import { mcqColumnValue, STATUS_FILTER_OPTIONS, DIFFICULTY_FILTER_OPTIONS } from '../../../shared/utils/mcq-columns';
+import { applyFilters, distinctOptions, SortState } from '../../../shared/utils/table-ops';
+import { mcqColumnValue, STATUS_FILTER_OPTIONS, DIFFICULTY_FILTER_OPTIONS, toBackendSortField } from '../../../shared/utils/mcq-columns';
 import { statusBadgeClass, difficultyBadgeClass } from '../../../shared/utils/badge';
 import { McqService } from '../../../core/services/mcq.service';
 import { ReviewService } from '../../../core/services/review.service';
 import { AdminService } from '../../../core/services/admin.service';
 import { StackService } from '../../../core/services/stack.service';
 import { SnackService } from '../../../core/services/snack.service';
-import { McqResponse, McqStatus, StackSummary } from '../../../core/models';
+import { McqResponse, McqStatus, Difficulty, StackSummary } from '../../../core/models';
 import { AssignReviewerDialogComponent } from './assign-reviewer-dialog.component';
 import { ConfirmService } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AiGenerateDialogComponent } from '../../questions/ai-generate-dialog/ai-generate-dialog.component';
@@ -35,7 +36,7 @@ import { QuestionDetailDialogComponent } from '../../questions/question-detail/q
   ],
   templateUrl: './question-bank.component.html',
 })
-export class QuestionBankComponent implements OnInit {
+export class QuestionBankComponent implements OnInit, OnDestroy {
   private mcqSvc    = inject(McqService);
   private reviewSvc = inject(ReviewService);
   private adminSvc  = inject(AdminService);
@@ -46,11 +47,15 @@ export class QuestionBankComponent implements OnInit {
   private route     = inject(ActivatedRoute);
   private confirm   = inject(ConfirmService);
 
-  allRows  = signal<McqResponse[]>([]);
+  // Server-driven page state. `pageRows` is the raw server page; `rows` applies the
+  // creator/reviewer current-page filters the backend does not support.
+  private pageRows = signal<McqResponse[]>([]);
   stacks   = signal<StackSummary[]>([]);
   loading  = signal(true);
   page     = signal(0);
   pageSize = signal(10);
+  totalElements = signal(0);
+  totalPages    = computed(() => Math.max(1, Math.ceil(this.totalElements() / this.pageSize())));
 
   sort    = signal<SortState>({ key: 'updated', dir: 'desc' });
   filters = signal<Record<string, string | null>>({
@@ -61,31 +66,30 @@ export class QuestionBankComponent implements OnInit {
   selectionCount = computed(() => this.selectedIds().size);
 
   searchQuery = signal('');
-  searching = signal(false);
 
   readonly value = mcqColumnValue;
   readonly statusOptions = STATUS_FILTER_OPTIONS;
   readonly difficultyOptions = DIFFICULTY_FILTER_OPTIONS;
   readonly statusBadge = statusBadgeClass;
   readonly diffBadge = difficultyBadgeClass;
-  stackOptions    = computed(() => distinctOptions(this.allRows(), mcqColumnValue, 'stack'));
-  creatorOptions  = computed(() => distinctOptions(this.allRows(), mcqColumnValue, 'creator'));
-  reviewerOptions = computed(() => distinctOptions(this.allRows(), mcqColumnValue, 'reviewer'));
 
-  private filtered = computed(() => applyFilters(this.allRows(), this.filters(), mcqColumnValue));
-  private sorted   = computed(() => applySort(this.filtered(), this.sort(), mcqColumnValue));
+  // Stack options come from the stacks list; creator/reviewer options are derived
+  // from the current page only (the backend cannot filter by them — see report).
+  stackOptions    = computed(() => this.stacks().map(s => ({ value: s.stackName, label: s.stackName })));
+  creatorOptions  = computed(() => distinctOptions(this.pageRows(), mcqColumnValue, 'creator'));
+  reviewerOptions = computed(() => distinctOptions(this.pageRows(), mcqColumnValue, 'reviewer'));
 
-  totalElements = computed(() => this.filtered().length);
-  totalPages    = computed(() => Math.max(1, Math.ceil(this.totalElements() / this.pageSize())));
+  /** Current page rows after applying the client-only creator/reviewer filters. */
   rows = computed(() => {
-    const start = this.page() * this.pageSize();
-    return this.sorted().slice(start, start + this.pageSize());
+    const f = this.filters();
+    return applyFilters(this.pageRows(), { creator: f['creator'], reviewer: f['reviewer'] }, mcqColumnValue);
   });
+
   activeFilterCount = computed(() => Object.values(this.filters()).filter(v => v != null).length);
 
-  /** All assignable (READY/UNDER) questions across the filtered set. */
+  /** Assignable (READY/UNDER) questions on the visible page. */
   selectableQuestions = computed(() =>
-    this.filtered().filter(q => q.status === 'READY_FOR_REVIEW' || q.status === 'UNDER_REVIEW'));
+    this.rows().filter(q => q.status === 'READY_FOR_REVIEW' || q.status === 'UNDER_REVIEW'));
 
   allSelectableSelected = computed(() => {
     const sel = this.selectedIds();
@@ -93,8 +97,20 @@ export class QuestionBankComponent implements OnInit {
     return selectable.length > 0 && selectable.every(q => sel.has(q.id));
   });
 
+  private searchInput$ = new Subject<string>();
+  private subs = new Subscription();
+
   ngOnInit(): void {
     this.stackSvc.getStacks().subscribe(r => this.stacks.set(r.data));
+
+    this.subs.add(
+      this.searchInput$.pipe(debounceTime(350), distinctUntilChanged()).subscribe(value => {
+        this.searchQuery.set(value);
+        this.page.set(0);
+        this.syncUrl();
+        this.load();
+      })
+    );
 
     // Restore state from the URL (copy-pasteable).
     const qp = this.route.snapshot.queryParamMap;
@@ -106,10 +122,13 @@ export class QuestionBankComponent implements OnInit {
     if (sortKey) this.sort.set({ key: sortKey, dir: qp.get('dir') === 'asc' ? 'asc' : 'desc' });
     const page = Number(qp.get('page'));
     if (page > 0) this.page.set(page);
+    const q = qp.get('q') ?? qp.get('search');
+    if (q) this.searchQuery.set(q);
 
-    const q = qp.get('q');
-    if (q) { this.searchQuery.set(q); this.search(); } else { this.load(); }
+    this.load();
   }
+
+  ngOnDestroy(): void { this.subs.unsubscribe(); }
 
   private syncUrl(): void {
     const f = this.filters();
@@ -123,37 +142,62 @@ export class QuestionBankComponent implements OnInit {
         sort: isDefaultSort ? null : s.key,
         dir:  isDefaultSort ? null : s.dir,
         page: this.page() > 0 ? this.page() : null,
-        q: this.searching() && this.searchQuery() ? this.searchQuery() : null,
+        search: this.searchQuery() || null,
+        q: null,
       },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
   }
 
+  /** Resolve the selected stack-name filter to its id for the server query. */
+  private selectedStackId(): number | undefined {
+    const name = this.filters()['stack'];
+    return name ? this.stacks().find(s => s.stackName === name)?.id : undefined;
+  }
+
   load(): void {
     this.loading.set(true);
     this.selectedIds.set(new Set());
-    this.searching.set(false);
-    this.mcqSvc.getAllQuestions({ page: 0, size: 1000 }).subscribe({
-      next: res => { this.allRows.set(res.data.content); this.loading.set(false); },
+    const f = this.filters();
+    const s = this.sort();
+    this.mcqSvc.getAllQuestions({
+      status: (f['status'] as McqStatus | null) ?? undefined,
+      stackId: this.selectedStackId(),
+      difficulty: (f['difficulty'] as Difficulty | null) ?? undefined,
+      search: this.searchQuery() || undefined,
+      sort: toBackendSortField(s.key),
+      direction: s.dir,
+      page: this.page(),
+      size: this.pageSize(),
+    }).subscribe({
+      next: res => {
+        this.pageRows.set(res.data.content);
+        this.totalElements.set(res.data.totalElements);
+        this.page.set(res.data.page);
+        this.loading.set(false);
+      },
       error: () => this.loading.set(false)
     });
   }
 
-  setSort(s: SortState): void { this.sort.set(s); this.page.set(0); this.syncUrl(); }
+  setSort(s: SortState): void { this.sort.set(s); this.page.set(0); this.syncUrl(); this.load(); }
   setFilter(key: string, value: string | null): void {
     this.filters.update(f => ({ ...f, [key]: value }));
     this.page.set(0);
     this.syncUrl();
+    // creator/reviewer are client-only filters over the current page — no reload needed.
+    if (key !== 'creator' && key !== 'reviewer') this.load();
   }
   clearFilters(): void {
     this.filters.set({ status: null, difficulty: null, stack: null, creator: null, reviewer: null });
     this.page.set(0);
     this.syncUrl();
+    this.load();
   }
 
-  prevPage(): void { if (this.page() > 0) { this.page.update(p => p - 1); this.syncUrl(); } }
-  nextPage(): void { if (this.page() < this.totalPages() - 1) { this.page.update(p => p + 1); this.syncUrl(); } }
+  prevPage(): void { if (this.page() > 0) { this.page.update(p => p - 1); this.syncUrl(); this.load(); } }
+  nextPage(): void { if (this.page() < this.totalPages() - 1) { this.page.update(p => p + 1); this.syncUrl(); this.load(); } }
 
   toggleSelect(id: number): void {
     this.selectedIds.update(set => {
@@ -290,27 +334,21 @@ export class QuestionBankComponent implements OnInit {
     ref.afterClosed().subscribe(result => { if (result) this.load(); });
   }
 
+  /** Debounced search as the user types (server-side via the list endpoint). */
+  onSearchInput(value: string): void { this.searchInput$.next(value); }
+
+  /** Immediate search (Search button / Enter). */
   search(): void {
-    const q = this.searchQuery().trim();
-    if (!q) { this.load(); return; }
-    this.searching.set(true);
-    this.loading.set(true);
     this.page.set(0);
     this.syncUrl();
-    this.mcqSvc.searchQuestions(q).subscribe({
-      next: results => {
-        this.allRows.set(results);
-        this.loading.set(false);
-        this.searching.set(false);
-      },
-      error: () => { this.loading.set(false); this.searching.set(false); }
-    });
+    this.load();
   }
 
   clearSearch(): void {
     this.searchQuery.set('');
-    this.load();
+    this.page.set(0);
     this.syncUrl();
+    this.load();
   }
 
   autoAssign(): void {
@@ -321,8 +359,7 @@ export class QuestionBankComponent implements OnInit {
   }
 
   exportXlsx(): void {
-    const stackName = this.filters()['stack'];
-    const stackId = stackName ? this.stacks().find(s => s.stackName === stackName)?.id : undefined;
+    const stackId = this.selectedStackId();
     const status = (this.filters()['status'] as McqStatus | null) ?? 'APPROVED';
     this.mcqSvc.exportQuestions({ stackId, status }).subscribe(blob => {
       const url = URL.createObjectURL(blob);

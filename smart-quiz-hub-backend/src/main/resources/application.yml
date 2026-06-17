@@ -88,6 +88,8 @@ app:
 jwt:
   secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  # Refresh token lifetime — defaults to 7 days. Used to mint new access tokens.
+  refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
 
 
 springdoc:

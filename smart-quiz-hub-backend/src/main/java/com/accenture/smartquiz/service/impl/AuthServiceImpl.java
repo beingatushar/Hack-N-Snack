@@ -3,6 +3,7 @@ package com.accenture.smartquiz.service.impl;
 import com.accenture.smartquiz.config.LoginRateLimiter;
 import com.accenture.smartquiz.dto.request.ChangePasswordRequest;
 import com.accenture.smartquiz.dto.request.LoginRequest;
+import com.accenture.smartquiz.dto.request.RefreshRequest;
 import com.accenture.smartquiz.dto.response.AuthResponse;
 import com.accenture.smartquiz.entity.User;
 import com.accenture.smartquiz.exception.ResourceNotFoundException;
@@ -48,28 +49,58 @@ public class AuthServiceImpl implements AuthService {
             rateLimiter.reset(request.enterpriseId());
 
             SmartQuizUserDetails userDetails = (SmartQuizUserDetails) auth.getPrincipal();
-            String token = jwtTokenProvider.generateToken(userDetails);
 
             User user = userRepository.findByEnterpriseId(userDetails.getEnterpriseId()).orElseThrow();
 
             log.info("Successful login for user ID: {}", user.getId());
 
-            return AuthResponse.builder()
-                    .token(token)
-                    .tokenType("Bearer")
-                    .userId(user.getId())
-                    .enterpriseId(user.getEnterpriseId())
-                    .fullName(user.getFullName())
-                    .email(user.getEmail())
-                    .role(user.getRole())
-                    .expiresIn(expirationMs / 1000)
-                    .build();
+            return buildAuthResponse(userDetails, user);
 
         } catch (BadCredentialsException ex) {
             rateLimiter.recordFailure(request.enterpriseId());
             log.warn("Failed login attempt (invalid credentials)");
             throw ex;
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AuthResponse refresh(RefreshRequest request) {
+        String enterpriseId = jwtTokenProvider.getEnterpriseIdFromRefreshToken(request.refreshToken());
+        if (enterpriseId == null) {
+            // Invalid / expired / non-refresh token — handled as a 401 by the global handler.
+            throw new BadCredentialsException("Invalid refresh token");
+        }
+
+        User user = userRepository.findByEnterpriseId(enterpriseId)
+                .orElseThrow(() -> new BadCredentialsException("Invalid refresh token"));
+
+        if (!user.isActive()) {
+            log.warn("Refresh rejected for disabled user ID: {}", user.getId());
+            throw new BadCredentialsException("Invalid refresh token");
+        }
+
+        SmartQuizUserDetails userDetails = new SmartQuizUserDetails(user);
+        log.info("Issued new access token via refresh for user ID: {}", user.getId());
+
+        return buildAuthResponse(userDetails, user);
+    }
+
+    private AuthResponse buildAuthResponse(SmartQuizUserDetails userDetails, User user) {
+        String token = jwtTokenProvider.generateToken(userDetails);
+        String refreshToken = jwtTokenProvider.generateRefreshToken(userDetails);
+
+        return AuthResponse.builder()
+                .token(token)
+                .refreshToken(refreshToken)
+                .tokenType("Bearer")
+                .userId(user.getId())
+                .enterpriseId(user.getEnterpriseId())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .expiresIn(expirationMs / 1000)
+                .build();
     }
 
     @Override

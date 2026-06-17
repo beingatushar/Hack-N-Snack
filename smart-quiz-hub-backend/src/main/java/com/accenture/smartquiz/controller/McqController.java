@@ -63,11 +63,17 @@ public class McqController {
     @Operation(summary = "Get questions created by the current user")
     public ResponseEntity<ApiResponse<PagedResponse<McqResponse>>> getMyQuestions(
             @RequestParam(required = false) McqStatus status,
+            @RequestParam(required = false) Long stackId,
+            @RequestParam(required = false) Difficulty difficulty,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "updatedAt") String sort,
+            @RequestParam(defaultValue = "desc") String direction,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
-        var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        return ResponseEntity.ok(ApiResponse.success(mcqService.getMyQuestions(status, currentUser, pageable)));
+        var pageable = PageRequest.of(page, size, resolveSort(sort, direction));
+        return ResponseEntity.ok(ApiResponse.success(
+                mcqService.getMyQuestions(status, stackId, difficulty, search, currentUser, pageable)));
     }
 
     @GetMapping
@@ -76,12 +82,30 @@ public class McqController {
             @RequestParam(required = false) McqStatus status,
             @RequestParam(required = false) Long stackId,
             @RequestParam(required = false) Difficulty difficulty,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "updatedAt") String sort,
+            @RequestParam(defaultValue = "desc") String direction,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
-        var pageable = PageRequest.of(page, size, Sort.by("updatedAt").descending());
+        var pageable = PageRequest.of(page, size, resolveSort(sort, direction));
         return ResponseEntity.ok(ApiResponse.success(
-                mcqService.getAllQuestions(status, stackId, difficulty, currentUser, pageable)));
+                mcqService.getAllQuestions(status, stackId, difficulty, search, currentUser, pageable)));
+    }
+
+    /**
+     * Builds a safe {@link Sort} from the {@code sort}/{@code direction} request params.
+     * Only a whitelist of entity fields is accepted (updatedAt, createdAt, difficulty,
+     * status); anything else falls back to {@code updatedAt} so callers can never sort
+     * by an arbitrary/unknown column.
+     */
+    private Sort resolveSort(String sort, String direction) {
+        String field = switch (sort == null ? "" : sort) {
+            case "createdAt", "difficulty", "status", "updatedAt" -> sort;
+            default -> "updatedAt";
+        };
+        Sort.Direction dir = "asc".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        return Sort.by(dir, field);
     }
 
     @PostMapping("/{id}/submit")

@@ -26,6 +26,7 @@ export interface PagedResponse<T> {
 
 export interface AuthResponse {
   token: string;
+  refreshToken: string;
   tokenType: string;
   userId: number;
   enterpriseId: string;
@@ -107,6 +108,7 @@ export interface DashboardStats {
   draftCount: number;
   readyForReviewCount: number;
   underReviewCount: number;
+  modificationRequestedCount: number;
   approvedCount: number;
   rejectedCount: number;
   pendingReviewCount: number;

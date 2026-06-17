@@ -115,18 +115,27 @@ public class McqServiceImpl implements McqService {
 
     @Override
     @Transactional(readOnly = true)
-    public PagedResponse<McqResponse> getMyQuestions(McqStatus status, SmartQuizUserDetails currentUser, Pageable pageable) {
-        Page<McqQuestion> page = status != null
-                ? mcqRepo.findByCreatorIdAndStatus(currentUser.getUserId(), status, pageable)
-                : mcqRepo.findByCreatorId(currentUser.getUserId(), pageable);
+    public PagedResponse<McqResponse> getMyQuestions(McqStatus status, Long stackId, Difficulty difficulty,
+                                                      String search, SmartQuizUserDetails currentUser, Pageable pageable) {
+        // Visibility: "my questions" are strictly the ones the current user authored.
+        Specification<McqQuestion> spec = (root, query, cb) -> {
+            var predicates = new ArrayList<jakarta.persistence.criteria.Predicate>();
+            predicates.add(cb.equal(root.get("creator").get("id"), currentUser.getUserId()));
+            if (status != null) predicates.add(cb.equal(root.get("status"), status));
+            if (stackId != null) predicates.add(cb.equal(root.get("stack").get("id"), stackId));
+            if (difficulty != null) predicates.add(cb.equal(root.get("difficulty"), difficulty));
+            addStemSearch(predicates, search, root, cb);
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+        Page<McqQuestion> page = mcqRepo.findAll(spec, pageable);
         return PagedResponse.of(page.map(McqMapper::toResponse));
     }
 
     @Override
     @Transactional(readOnly = true)
     public PagedResponse<McqResponse> getAllQuestions(McqStatus status, Long stackId, Difficulty difficulty,
-                                                       SmartQuizUserDetails currentUser, Pageable pageable) {
-        Specification<McqQuestion> spec = buildSpec(status, stackId, difficulty, currentUser);
+                                                       String search, SmartQuizUserDetails currentUser, Pageable pageable) {
+        Specification<McqQuestion> spec = buildSpec(status, stackId, difficulty, search, currentUser);
         Page<McqQuestion> page = mcqRepo.findAll(spec, pageable);
         return PagedResponse.of(page.map(McqMapper::toResponse));
     }
@@ -225,6 +234,7 @@ public class McqServiceImpl implements McqService {
                     .draftCount(mcqRepo.countByStatus(McqStatus.DRAFT))
                     .readyForReviewCount(mcqRepo.countByStatus(McqStatus.READY_FOR_REVIEW))
                     .underReviewCount(mcqRepo.countByStatus(McqStatus.UNDER_REVIEW))
+                    .modificationRequestedCount(mcqRepo.countByStatus(McqStatus.MODIFICATION_REQUESTED))
                     .approvedCount(mcqRepo.countByStatus(McqStatus.APPROVED))
                     .rejectedCount(mcqRepo.countByStatus(McqStatus.REJECTED))
                     .build();
@@ -236,6 +246,7 @@ public class McqServiceImpl implements McqService {
                 .draftCount(mcqRepo.countByCreatorIdAndStatus(uid, McqStatus.DRAFT))
                 .readyForReviewCount(mcqRepo.countByCreatorIdAndStatus(uid, McqStatus.READY_FOR_REVIEW))
                 .underReviewCount(mcqRepo.countByCreatorIdAndStatus(uid, McqStatus.UNDER_REVIEW))
+                .modificationRequestedCount(mcqRepo.countByCreatorIdAndStatus(uid, McqStatus.MODIFICATION_REQUESTED))
                 .approvedCount(mcqRepo.countByCreatorIdAndStatus(uid, McqStatus.APPROVED))
                 .rejectedCount(mcqRepo.countByCreatorIdAndStatus(uid, McqStatus.REJECTED))
                 .pendingReviewCount(mcqRepo.countByReviewerIdAndStatus(uid, McqStatus.UNDER_REVIEW))
@@ -628,7 +639,7 @@ public class McqServiceImpl implements McqService {
     }
 
     private Specification<McqQuestion> buildSpec(McqStatus status, Long stackId, Difficulty difficulty,
-                                                   SmartQuizUserDetails currentUser) {
+                                                   String search, SmartQuizUserDetails currentUser) {
         return (root, query, cb) -> {
             var predicates = new ArrayList<jakarta.persistence.criteria.Predicate>();
 
@@ -641,8 +652,19 @@ public class McqServiceImpl implements McqService {
             if (status != null) predicates.add(cb.equal(root.get("status"), status));
             if (stackId != null) predicates.add(cb.equal(root.get("stack").get("id"), stackId));
             if (difficulty != null) predicates.add(cb.equal(root.get("difficulty"), difficulty));
+            addStemSearch(predicates, search, root, cb);
 
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
         };
+    }
+
+    /** Adds a case-insensitive LIKE on questionStem when {@code search} is non-blank. */
+    private void addStemSearch(List<jakarta.persistence.criteria.Predicate> predicates, String search,
+                               jakarta.persistence.criteria.Root<McqQuestion> root,
+                               jakarta.persistence.criteria.CriteriaBuilder cb) {
+        if (search != null && !search.isBlank()) {
+            String pattern = "%" + search.trim().toLowerCase() + "%";
+            predicates.add(cb.like(cb.lower(root.get("questionStem")), pattern));
+        }
     }
 }

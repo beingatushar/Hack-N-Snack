@@ -2,6 +2,7 @@ package com.accenture.smartquiz.controller;
 
 import com.accenture.smartquiz.dto.request.ChangePasswordRequest;
 import com.accenture.smartquiz.dto.request.LoginRequest;
+import com.accenture.smartquiz.dto.request.RefreshRequest;
 import com.accenture.smartquiz.dto.response.ApiResponse;
 import com.accenture.smartquiz.dto.response.AuthResponse;
 import com.accenture.smartquiz.security.SmartQuizUserDetails;
@@ -27,6 +28,13 @@ public class AuthController {
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success("Login successful", response));
+    }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "Exchange a valid refresh token for a new access token")
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(@Valid @RequestBody RefreshRequest request) {
+        AuthResponse response = authService.refresh(request);
+        return ResponseEntity.ok(ApiResponse.success("Token refreshed", response));
     }
 
     @PostMapping("/change-password")

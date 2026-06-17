@@ -7,6 +7,21 @@ import {
 } from '../models';
 import { environment } from '../../../environments/environment';
 
+/** Backend-supported sort fields for the paged question list endpoints. */
+export type McqSortField = 'updatedAt' | 'createdAt' | 'difficulty' | 'status';
+
+/** Query options for the server-side paged question list endpoints. */
+export interface McqListQuery {
+  status?: McqStatus;
+  stackId?: number;
+  difficulty?: Difficulty;
+  search?: string;
+  sort?: McqSortField;
+  direction?: 'asc' | 'desc';
+  page?: number;
+  size?: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class McqService {
   private base = `${environment.apiUrl}/questions`;
@@ -25,21 +40,30 @@ export class McqService {
     return this.http.get<ApiResponse<McqResponse>>(`${this.base}/${id}`);
   }
 
-  getMyQuestions(status?: McqStatus, page = 0, size = 10): Observable<ApiResponse<PagedResponse<McqResponse>>> {
-    let params = new HttpParams().set('page', page).set('size', size);
-    if (status) params = params.set('status', status);
-    return this.http.get<ApiResponse<PagedResponse<McqResponse>>>(`${this.base}/my`, { params });
+  getMyQuestions(filters: McqListQuery = {}): Observable<ApiResponse<PagedResponse<McqResponse>>> {
+    return this.http.get<ApiResponse<PagedResponse<McqResponse>>>(`${this.base}/my`, {
+      params: this.buildListParams(filters),
+    });
   }
 
-  getAllQuestions(filters: { status?: McqStatus; stackId?: number; difficulty?: Difficulty; page?: number; size?: number }):
-    Observable<ApiResponse<PagedResponse<McqResponse>>> {
+  getAllQuestions(filters: McqListQuery = {}): Observable<ApiResponse<PagedResponse<McqResponse>>> {
+    return this.http.get<ApiResponse<PagedResponse<McqResponse>>>(this.base, {
+      params: this.buildListParams(filters),
+    });
+  }
+
+  /** Shared query-param builder for the server-side paged list endpoints. */
+  private buildListParams(f: McqListQuery): HttpParams {
     let params = new HttpParams()
-      .set('page', filters.page ?? 0)
-      .set('size', filters.size ?? 10);
-    if (filters.status)     params = params.set('status', filters.status);
-    if (filters.stackId)    params = params.set('stackId', filters.stackId);
-    if (filters.difficulty) params = params.set('difficulty', filters.difficulty);
-    return this.http.get<ApiResponse<PagedResponse<McqResponse>>>(this.base, { params });
+      .set('page', f.page ?? 0)
+      .set('size', f.size ?? 10);
+    if (f.status)     params = params.set('status', f.status);
+    if (f.stackId)    params = params.set('stackId', f.stackId);
+    if (f.difficulty) params = params.set('difficulty', f.difficulty);
+    if (f.search?.trim()) params = params.set('search', f.search.trim());
+    if (f.sort)      params = params.set('sort', f.sort);
+    if (f.direction) params = params.set('direction', f.direction);
+    return params;
   }
 
   submitForReview(id: number): Observable<ApiResponse<McqResponse>> {

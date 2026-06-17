@@ -11,6 +11,7 @@ public class DashboardStatsResponse {
     private long draftCount;
     private long readyForReviewCount;
     private long underReviewCount;
+    private long modificationRequestedCount;
     private long approvedCount;
     private long rejectedCount;
     private long pendingReviewCount;

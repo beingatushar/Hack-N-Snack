@@ -5,8 +5,9 @@ import { Observable, tap } from 'rxjs';
 import { ApiResponse, AuthResponse, LoginRequest } from '../models';
 import { environment } from '../../../environments/environment';
 
-const TOKEN_KEY = 'sqh_token';
-const USER_KEY  = 'sqh_user';
+const TOKEN_KEY   = 'sqh_token';
+const REFRESH_KEY = 'sqh_refresh_token';
+const USER_KEY    = 'sqh_user';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -26,9 +27,27 @@ export class AuthService {
       .pipe(
         tap(res => {
           if (res.success && res.data) {
-            localStorage.setItem(TOKEN_KEY, res.data.token);
-            localStorage.setItem(USER_KEY, JSON.stringify(res.data));
-            this._user.set(res.data);
+            this.storeSession(res.data);
+          }
+        })
+      );
+  }
+
+  /**
+   * Exchanges the stored refresh token for a fresh access token (and a new
+   * refresh token). Updates storage and the current-user signal on success.
+   * Callers (the error interceptor) handle failures by logging out.
+   */
+  refresh(): Observable<ApiResponse<AuthResponse>> {
+    const refreshToken = this.getRefreshToken();
+    return this.http
+      .post<ApiResponse<AuthResponse>>(`${environment.apiUrl}/auth/refresh`, {
+        refreshToken,
+      })
+      .pipe(
+        tap(res => {
+          if (res.success && res.data) {
+            this.storeSession(res.data);
           }
         })
       );
@@ -50,6 +69,7 @@ export class AuthService {
 
   logout(): void {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_KEY);
     localStorage.removeItem(USER_KEY);
     this._user.set(null);
     this.router.navigate(['/login']);
@@ -57,6 +77,18 @@ export class AuthService {
 
   getToken(): string | null {
     return localStorage.getItem(TOKEN_KEY);
+  }
+
+  getRefreshToken(): string | null {
+    return localStorage.getItem(REFRESH_KEY);
+  }
+
+  /** Persists tokens + user and refreshes the current-user signal. */
+  private storeSession(data: AuthResponse): void {
+    localStorage.setItem(TOKEN_KEY, data.token);
+    localStorage.setItem(REFRESH_KEY, data.refreshToken);
+    localStorage.setItem(USER_KEY, JSON.stringify(data));
+    this._user.set(data);
   }
 
   private loadUser(): AuthResponse | null {

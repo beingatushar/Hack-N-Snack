@@ -83,7 +83,7 @@
         <div class="skeleton h-12 w-full mb-2.5"></div>
       }
     </div>
-  } @else if (allRows().length === 0) {
+  } @else if (totalElements() === 0 && activeFilterCount() === 0 && !search()) {
     <div class="card py-20 flex flex-col items-center gap-4 text-center animate-fade-up">
       <div class="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center">
         <span class="material-icons text-indigo-400 text-3xl">quiz</span>

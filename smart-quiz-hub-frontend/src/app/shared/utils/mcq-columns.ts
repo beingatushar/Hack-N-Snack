@@ -1,5 +1,21 @@
 import { McqResponse } from '../../core/models';
 import { FilterOption } from './table-ops';
+import { McqSortField } from '../../core/services/mcq.service';
+
+/**
+ * Maps a table-header `sortKey` to a backend-supported sort field.
+ * Columns the backend cannot sort (stem, stack, creator, reviewer) fall back to
+ * `updatedAt` so the request stays valid while the header still appears active.
+ */
+export function toBackendSortField(sortKey: string): McqSortField {
+  switch (sortKey) {
+    case 'updated':    return 'updatedAt';
+    case 'created':    return 'createdAt';
+    case 'difficulty': return 'difficulty';
+    case 'status':     return 'status';
+    default:           return 'updatedAt';
+  }
+}
 
 /** Maps a column key to a comparable/filterable raw value on an MCQ row. */
 export function mcqColumnValue(q: McqResponse, key: string): string {
