@@ -4,6 +4,7 @@ import { AnalyticsService } from '../../core/services/analytics.service';
 import { AnalyticsOverview, QuestionAnalytics, ReviewerWorkload, SmeReport } from '../../core/models';
 import { ButtonDirective } from '../../shared/components/button/button.directive';
 import { CountUpDirective } from '../../shared/directives/count-up.directive';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 type Tab = 'global' | 'users' | 'questions';
 
@@ -13,7 +14,7 @@ interface BarRow { label: string; value: number; pct: number; color: string; }
 @Component({
   selector: 'app-analytics',
   standalone: true,
-  imports: [CommonModule, ButtonDirective, CountUpDirective],
+  imports: [CommonModule, ButtonDirective, CountUpDirective, PageHeaderComponent],
   templateUrl: './analytics.component.html',
 })
 export class AnalyticsComponent implements OnInit {

@@ -8,13 +8,14 @@ import { McqService } from '../../../core/services/mcq.service';
 import { SnackService } from '../../../core/services/snack.service';
 import { BulkUploadResponse } from '../../../core/models';
 import { ButtonDirective } from '../../../shared/components/button/button.directive';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 
 @Component({
   selector: 'app-bulk-upload',
   standalone: true,
   imports: [
     MatCardModule, MatButtonModule, MatIconModule,
-    MatProgressBarModule, MatListModule, ButtonDirective
+    MatProgressBarModule, MatListModule, ButtonDirective, PageHeaderComponent
   ],
   templateUrl: './bulk-upload.component.html',
 })

@@ -20,6 +20,7 @@ import { StackService } from '../../../core/services/stack.service';
 import { SnackService } from '../../../core/services/snack.service';
 import { McqResponse, McqStatus, StackSummary } from '../../../core/models';
 import { AssignReviewerDialogComponent } from './assign-reviewer-dialog.component';
+import { ConfirmService } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AiGenerateDialogComponent } from '../../questions/ai-generate-dialog/ai-generate-dialog.component';
 import { QuestionFormComponent } from '../../questions/question-form/question-form.component';
 import { QuestionDetailDialogComponent } from '../../questions/question-detail/question-detail-dialog.component';
@@ -43,6 +44,7 @@ export class QuestionBankComponent implements OnInit {
   private snack     = inject(SnackService);
   private router    = inject(Router);
   private route     = inject(ActivatedRoute);
+  private confirm   = inject(ConfirmService);
 
   allRows  = signal<McqResponse[]>([]);
   stacks   = signal<StackSummary[]>([]);
@@ -225,10 +227,16 @@ export class QuestionBankComponent implements OnInit {
   }
 
   delete(q: McqResponse): void {
-    if (!confirm(`Delete this question?\n\n"${q.questionStem.slice(0, 80)}…"`)) return;
-    this.mcqSvc.deleteQuestion(q.id).subscribe({
-      next: () => { this.snack.success('Question deleted'); this.load(); },
-      error: err => this.snack.error(err.error?.message ?? 'Delete failed')
+    this.confirm.ask({
+      title: 'Delete question?',
+      message: `"${q.questionStem.slice(0, 100)}${q.questionStem.length > 100 ? '…' : ''}"\n\nThis cannot be undone.`,
+      confirmText: 'Delete', variant: 'danger', icon: 'delete',
+    }).then(ok => {
+      if (!ok) return;
+      this.mcqSvc.deleteQuestion(q.id).subscribe({
+        next: () => { this.snack.success('Question deleted'); this.load(); },
+        error: err => this.snack.error(err.error?.message ?? 'Delete failed')
+      });
     });
   }
 

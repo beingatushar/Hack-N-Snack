@@ -1,4 +1,5 @@
 import { Component, signal } from '@angular/core';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { UserManagementComponent } from '../user-management/user-management.component';
 import { StackManagementComponent } from '../stack-management/stack-management.component';
 
@@ -6,20 +7,15 @@ type ATab = 'users' | 'stacks';
 
 /**
  * Administration hub — consolidates user management and the stack/topic taxonomy
- * behind a single nav entry with tabs.
+ * behind a single nav entry with tabs. Children no longer render their own titles.
  */
 @Component({
   selector: 'app-admin-hub',
   standalone: true,
-  imports: [UserManagementComponent, StackManagementComponent],
+  imports: [PageHeaderComponent, UserManagementComponent, StackManagementComponent],
   template: `
-    <div class="mb-6 animate-fade-up">
-      <h1 class="text-2xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
-        <span class="material-icons text-indigo-600" aria-hidden="true">admin_panel_settings</span>
-        Administration
-      </h1>
-      <p class="text-slate-500 text-sm mt-1">Manage users and the technology-stack taxonomy</p>
-    </div>
+    <app-page-header icon="admin_panel_settings" title="Administration"
+                     subtitle="Manage users and the technology-stack taxonomy"></app-page-header>
 
     <div class="inline-flex gap-1 card p-1.5 mb-6 animate-fade-up" role="tablist" aria-label="Administration sections">
       @for (t of tabs; track t.id) {

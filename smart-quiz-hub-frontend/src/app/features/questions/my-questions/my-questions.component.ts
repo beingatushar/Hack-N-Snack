@@ -16,6 +16,7 @@ import { RelativeTimePipe } from '../../../shared/pipes/relative-time.pipe';
 import { TableHeaderCellComponent } from '../../../shared/components/table-header-cell/table-header-cell.component';
 import { ButtonDirective } from '../../../shared/components/button/button.directive';
 import { CountUpDirective } from '../../../shared/directives/count-up.directive';
+import { ConfirmService } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { applyFilters, applySort, distinctOptions, SortState } from '../../../shared/utils/table-ops';
 import { mcqColumnValue, STATUS_FILTER_OPTIONS, DIFFICULTY_FILTER_OPTIONS } from '../../../shared/utils/mcq-columns';
 import { statusBadgeClass, difficultyBadgeClass, statusLabel } from '../../../shared/utils/badge';
@@ -35,6 +36,7 @@ export class MyQuestionsComponent implements OnInit {
   private snack  = inject(SnackService);
   private router = inject(Router);
   private route  = inject(ActivatedRoute);
+  private confirm = inject(ConfirmService);
 
   allRows  = signal<McqResponse[]>([]);
   loading  = signal(true);
@@ -43,6 +45,7 @@ export class MyQuestionsComponent implements OnInit {
 
   sort    = signal<SortState>({ key: 'updated', dir: 'desc' });
   filters = signal<Record<string, string | null>>({ status: null, difficulty: null, stack: null });
+  search  = signal('');
 
   readonly statusOptions = STATUS_FILTER_OPTIONS;
   readonly difficultyOptions = DIFFICULTY_FILTER_OPTIONS;
@@ -53,7 +56,11 @@ export class MyQuestionsComponent implements OnInit {
 
   stackOptions = computed(() => distinctOptions(this.allRows(), mcqColumnValue, 'stack'));
 
-  private filtered = computed(() => applyFilters(this.allRows(), this.filters(), mcqColumnValue));
+  private filtered = computed(() => {
+    const base = applyFilters(this.allRows(), this.filters(), mcqColumnValue);
+    const q = this.search().trim().toLowerCase();
+    return q ? base.filter(r => r.questionStem.toLowerCase().includes(q)) : base;
+  });
   private sorted   = computed(() => applySort(this.filtered(), this.sort(), mcqColumnValue));
 
   totalElements = computed(() => this.filtered().length);
@@ -129,8 +136,13 @@ export class MyQuestionsComponent implements OnInit {
   }
   clearFilters(): void {
     this.filters.set({ status: null, difficulty: null, stack: null });
+    this.search.set('');
     this.page.set(0);
     this.syncUrl();
+  }
+  onSearch(value: string): void {
+    this.search.set(value);
+    this.page.set(0);
   }
   /** Quick-filter the table from a stat card click. */
   filterByStatus(status: string | null): void {
@@ -171,10 +183,16 @@ export class MyQuestionsComponent implements OnInit {
   }
 
   delete(q: McqResponse): void {
-    if (!confirm('Delete this question?')) return;
-    this.mcqSvc.deleteQuestion(q.id).subscribe({
-      next: () => { this.snack.success('Question deleted'); this.load(); },
-      error: err => this.snack.error(err.error?.message ?? 'Delete failed')
+    this.confirm.ask({
+      title: 'Delete question?',
+      message: 'This question will be permanently removed. This cannot be undone.',
+      confirmText: 'Delete', variant: 'danger', icon: 'delete',
+    }).then(ok => {
+      if (!ok) return;
+      this.mcqSvc.deleteQuestion(q.id).subscribe({
+        next: () => { this.snack.success('Question deleted'); this.load(); },
+        error: err => this.snack.error(err.error?.message ?? 'Delete failed')
+      });
     });
   }
 

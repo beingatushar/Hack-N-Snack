@@ -13,6 +13,7 @@ import { RelativeTimePipe } from '../../../shared/pipes/relative-time.pipe';
 import { CountUpDirective } from '../../../shared/directives/count-up.directive';
 import { applyFilters, applySort, FilterOption, SortState } from '../../../shared/utils/table-ops';
 import { UserFormDialogComponent } from './user-form-dialog.component';
+import { ConfirmService } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 
 function userValue(u: AdminUser, key: string): string {
   switch (key) {
@@ -40,6 +41,7 @@ export class UserManagementComponent implements OnInit {
   private dialog  = inject(MatDialog);
   private auth    = inject(AuthService);
   private snack   = inject(SnackService);
+  private confirm = inject(ConfirmService);
 
   allRows  = signal<AdminUser[]>([]);
   loading  = signal(true);
@@ -145,10 +147,16 @@ export class UserManagementComponent implements OnInit {
   }
 
   delete(u: AdminUser): void {
-    if (!confirm(`Delete ${u.fullName} (${u.enterpriseId})? This cannot be undone.`)) return;
-    this.userSvc.delete(u.id).subscribe({
-      next: () => { this.snack.success('User deleted'); this.load(); },
-      error: err => this.snack.error(err.error?.message ?? 'Failed'),
+    this.confirm.ask({
+      title: 'Delete user?',
+      message: `${u.fullName} (${u.enterpriseId}) will be removed. If they have authored or reviewed questions, they'll be deactivated instead.`,
+      confirmText: 'Delete', variant: 'danger', icon: 'person_remove',
+    }).then(ok => {
+      if (!ok) return;
+      this.userSvc.delete(u.id).subscribe({
+        next: () => { this.snack.success('User deleted'); this.load(); },
+        error: err => this.snack.error(err.error?.message ?? 'Failed'),
+      });
     });
   }
 }

@@ -1,19 +1,25 @@
 import { Component, inject, signal } from '@angular/core';
 import { AuthService } from '../../../core/services/auth.service';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { MyQuestionsComponent } from '../my-questions/my-questions.component';
 import { QuestionBankComponent } from '../../admin/question-bank/question-bank.component';
 
 type QTab = 'mine' | 'all';
 
 /**
- * Unified Questions screen. SMEs see only their own questions; admins get a
- * "My Questions / Question Bank" toggle that swaps between the two existing views.
+ * Unified Questions screen with a single header. SMEs see only their own
+ * questions; admins get a "Question Bank / My Questions" toggle that swaps
+ * between the two existing views (which no longer render their own titles).
  */
 @Component({
   selector: 'app-questions-hub',
   standalone: true,
-  imports: [MyQuestionsComponent, QuestionBankComponent],
+  imports: [PageHeaderComponent, MyQuestionsComponent, QuestionBankComponent],
   template: `
+    <app-page-header icon="quiz" title="Questions"
+                     [subtitle]="auth.isAdmin() ? 'Browse the bank, manage and analyse questions' : 'Manage, track and analyse your submitted questions'">
+    </app-page-header>
+
     @if (auth.isAdmin()) {
       <div class="inline-flex gap-1 card p-1.5 mb-5 animate-fade-up" role="tablist" aria-label="Questions scope">
         @for (t of tabs; track t.id) {

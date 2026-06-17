@@ -1,12 +1,7 @@
 <div class="animate-fade-up">
 
-  <!-- Header -->
-  <div class="flex items-start justify-between mb-6 gap-4 flex-wrap animate-fade-up">
-    <div>
-      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Question <span class="text-gradient">Bank</span></h1>
-      <p class="text-slate-500 text-sm mt-1">All questions across stacks, statuses and creators</p>
-    </div>
-    <div class="flex items-center gap-3 flex-wrap justify-end">
+  <!-- Action toolbar (title is provided by the Questions hub) -->
+  <div class="flex items-center gap-3 flex-wrap justify-end mb-5 animate-fade-up">
       @if (activeFilterCount() > 0) {
         <button (click)="clearFilters()" appBtn="secondary">
           <span class="material-icons text-[16px]" aria-hidden="true">filter_alt_off</span>
@@ -27,7 +22,6 @@
         Export XLSX
       </button>
     </div>
-  </div>
 
   <!-- Search bar -->
   <div class="flex gap-2 mb-4">

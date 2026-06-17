@@ -14,6 +14,8 @@ import { RelativeTimePipe } from '../../../shared/pipes/relative-time.pipe';
 import { ColumnFilterComponent } from '../../../shared/components/column-filter/column-filter.component';
 import { ButtonDirective } from '../../../shared/components/button/button.directive';
 import { QuestionDetailDialogComponent } from '../../questions/question-detail/question-detail-dialog.component';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
+import { ConfirmService } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { applyFilters, applySort, distinctOptions, SortState } from '../../../shared/utils/table-ops';
 import { mcqColumnValue, DIFFICULTY_FILTER_OPTIONS } from '../../../shared/utils/mcq-columns';
 import { statusBadgeClass, difficultyBadgeClass } from '../../../shared/utils/badge';
@@ -25,7 +27,8 @@ type ReviewTab = 'pending' | 'reviewed';
   standalone: true,
   imports: [
     MatButtonModule, MatIconModule, MatMenuModule, MatTooltipModule,
-    FormsModule, NgClass, DatePipe, RelativeTimePipe, ColumnFilterComponent, ButtonDirective
+    FormsModule, NgClass, DatePipe, RelativeTimePipe, ColumnFilterComponent, ButtonDirective,
+    PageHeaderComponent
   ],
   templateUrl: './pending-reviews.component.html',
 })
@@ -35,6 +38,7 @@ export class PendingReviewsComponent implements OnInit {
   private dialog    = inject(MatDialog);
   private router    = inject(Router);
   private route     = inject(ActivatedRoute);
+  private confirm   = inject(ConfirmService);
 
   tab      = signal<ReviewTab>('pending');
   allRows  = signal<McqResponse[]>([]);
@@ -151,12 +155,16 @@ export class PendingReviewsComponent implements OnInit {
       this.snack.error('Please provide feedback comments before rejecting');
       return;
     }
-    if (!confirm('Rejecting is permanent — this question will be locked from all future edits. Continue?')) {
-      return;
-    }
-    this.reviewSvc.submitReview(q.id, { decision: 'REJECTED', comments }).subscribe({
-      next: () => { this.snack.success('Question rejected with feedback'); this.load(); },
-      error: err => this.snack.error(err.error?.message ?? 'Failed')
+    this.confirm.ask({
+      title: 'Reject this question?',
+      message: 'Rejecting is permanent — the question will be locked from all future edits.',
+      confirmText: 'Reject', variant: 'danger', icon: 'cancel',
+    }).then(ok => {
+      if (!ok) return;
+      this.reviewSvc.submitReview(q.id, { decision: 'REJECTED', comments }).subscribe({
+        next: () => { this.snack.success('Question rejected with feedback'); this.load(); },
+        error: err => this.snack.error(err.error?.message ?? 'Failed')
+      });
     });
   }
 

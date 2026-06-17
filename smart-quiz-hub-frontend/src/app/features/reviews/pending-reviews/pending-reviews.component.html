@@ -1,19 +1,16 @@
 <div class="animate-fade-up">
 
   <!-- Header -->
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
-    <div>
-      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Reviews</h1>
-      <p class="text-slate-500 text-sm mt-1">
-        {{ tab() === 'pending' ? 'Review and decide on questions assigned to you' : 'Questions you have already decided' }}
-      </p>
-    </div>
+  <app-page-header
+    icon="rate_review"
+    title="Pending Reviews"
+    [subtitle]="tab() === 'pending' ? 'Review and decide on questions assigned to you' : 'Questions you have already decided'">
     @if (tab() === 'pending' && totalElements() > 0) {
       <span class="animate-pop px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold border border-amber-200">
         {{ totalElements() }} pending
       </span>
     }
-  </div>
+  </app-page-header>
 
   <!-- Tabs -->
   <div class="inline-flex rounded-xl border border-slate-200 bg-white p-1 mb-5">

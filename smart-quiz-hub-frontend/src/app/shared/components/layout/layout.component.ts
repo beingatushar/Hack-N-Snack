@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, HostListener, computed, inject, signal } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../.././../core/services/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -25,6 +25,7 @@ interface NavItem {
 export class LayoutComponent implements OnInit, OnDestroy {
   auth = inject(AuthService);
   notifService = inject(NotificationService);
+  private router = inject(Router);
   collapsed = signal(false);
   mobileOpen = signal(false);
 
@@ -82,6 +83,14 @@ export class LayoutComponent implements OnInit, OnDestroy {
       this.notifications.update(ns => ns.map(n => n.id === id ? { ...n, read: true } : n));
       this.unreadCount.update(c => Math.max(0, c - 1));
     });
+  }
+
+  /** Mark read, close the panel, and deep-link to the relevant screen by type. */
+  openNotification(n: AppNotification) {
+    if (!n.read) this.markRead(n.id);
+    this.bellOpen.set(false);
+    const target = n.type === 'REVIEW_ASSIGNED' ? '/reviews' : '/questions';
+    this.router.navigate([target]);
   }
 
   markAllRead() {

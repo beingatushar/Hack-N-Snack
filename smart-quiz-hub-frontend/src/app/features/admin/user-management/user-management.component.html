@@ -1,12 +1,7 @@
 <div class="animate-fade-up">
 
-  <!-- Header -->
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 animate-fade-up">
-    <div>
-      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Super Admin · <span class="text-gradient">Users</span></h1>
-      <p class="text-slate-500 text-sm mt-1">Create and manage SMEs and admins — no DB migrations needed</p>
-    </div>
-    <div class="flex items-center gap-3">
+  <!-- Action toolbar (title is provided by the Administration hub) -->
+  <div class="flex items-center justify-end gap-3 mb-5">
       @if (activeFilterCount() > 0 || search()) {
         <button (click)="clearFilters()" appBtn="secondary">
           <span class="material-icons text-[16px]" aria-hidden="true">filter_alt_off</span> Clear
@@ -15,7 +10,6 @@
       <button (click)="openCreate()" appBtn="primary">
         <span class="material-icons text-[17px]" aria-hidden="true">person_add</span> Add User
       </button>
-    </div>
   </div>
 
   <!-- Stats strip -->

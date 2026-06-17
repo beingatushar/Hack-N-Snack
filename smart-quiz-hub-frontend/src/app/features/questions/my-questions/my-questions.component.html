@@ -1,16 +1,19 @@
 <div class="animate-fade-up">
 
-  <!-- Header -->
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-    <div>
-      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">My Questions</h1>
-      <p class="text-slate-500 text-sm mt-1">Manage, track and analyse your submitted questions</p>
-    </div>
-    <div class="flex items-center gap-3">
-      @if (activeFilterCount() > 0) {
+  <!-- Action toolbar (title is provided by the Questions hub) -->
+  <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
+      <div class="relative flex-1 sm:max-w-xs">
+        <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]" aria-hidden="true">search</span>
+        <input [value]="search()" (input)="onSearch($any($event.target).value)"
+               aria-label="Search my questions"
+               placeholder="Search my questions…"
+               class="field w-full h-10 pl-10 pr-3 text-sm" />
+      </div>
+      <div class="flex items-center gap-3 sm:ml-auto">
+      @if (activeFilterCount() > 0 || search()) {
         <button (click)="clearFilters()" appBtn="secondary">
           <span class="material-icons text-[16px]">filter_alt_off</span>
-          Clear ({{ activeFilterCount() }})
+          Clear{{ activeFilterCount() > 0 ? ' (' + activeFilterCount() + ')' : '' }}
         </button>
       }
       <button [matMenuTriggerFor]="addMenu" appBtn="primary">
@@ -32,8 +35,8 @@
           <span class="align-middle">Generate with AI</span>
         </button>
       </mat-menu>
+      </div>
     </div>
-  </div>
 
   <!-- Analytics strip — click a card to filter the table -->
   <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-7 stagger">

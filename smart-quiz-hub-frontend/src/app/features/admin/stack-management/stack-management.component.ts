@@ -13,12 +13,8 @@ import { CountUpDirective } from '../../../shared/directives/count-up.directive'
   template: `
     <div class="animate-fade-up">
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 animate-fade-up">
-        <div>
-          <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Stack & Topic <span class="text-gradient">Management</span></h1>
-          <p class="text-slate-500 text-sm mt-1">Manage technology stacks and their topics</p>
-        </div>
+      <!-- Action toolbar (title is provided by the Administration hub) -->
+      <div class="flex items-center justify-end mb-5">
         <button (click)="openStackForm()" appBtn="primary">
           <span class="material-icons text-[17px]" aria-hidden="true">add</span>
           New Stack
