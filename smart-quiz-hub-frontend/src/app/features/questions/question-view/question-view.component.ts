@@ -662,16 +662,29 @@ export class QuestionViewComponent implements OnInit {
     if (!this.q || this.actionLoading) return;
     this.actionLoading = true;
     this.reviewSvc.submitReview(this.q.id, { decision }).subscribe({
-      next: res => {
-        this.q = res.data;
+      next: () => {
         this.snack.success('Question approved');
         this.actionLoading = false;
+        this.leaveAfterDecision();
       },
       error: err => {
         this.snack.error(err?.error?.message ?? 'Failed to approve');
         this.actionLoading = false;
       },
     });
+  }
+
+  /**
+   * After a final review decision the reviewer is done with the question, so it should
+   * "go away": close the tab if this view was opened in its own tab from a review queue,
+   * otherwise return to the Reviews queue.
+   */
+  private leaveAfterDecision(): void {
+    if (window.opener && !window.opener.closed) {
+      window.close();
+      return;
+    }
+    this.router.navigate(['/reviews']);
   }
 
   submitDecision(): void {
