@@ -46,6 +46,16 @@ export class LayoutComponent implements OnInit, OnDestroy {
     this.mobileOpen.set(false);
   }
 
+  /** Close the notifications panel when clicking anywhere outside it. */
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent) {
+    if (!this.bellOpen()) return;
+    const target = event.target as HTMLElement;
+    if (!target.closest('[data-bell]')) {
+      this.bellOpen.set(false);
+    }
+  }
+
   navItems: NavItem[] = [
     { icon: 'dashboard',     label: 'Dashboard',       route: '/dashboard',       exact: true },
     { icon: 'quiz',          label: 'Questions',       route: '/questions' },
