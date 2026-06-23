@@ -49,7 +49,7 @@ export class MyQuestionsComponent implements OnInit, OnDestroy {
   totalPages    = computed(() => Math.max(1, Math.ceil(this.totalElements() / this.pageSize())));
 
   sort    = signal<SortState>({ key: 'updated', dir: 'desc' });
-  filters = signal<Record<string, string | null>>({ status: null, difficulty: null, stack: null });
+  filters = signal<Record<string, string | null>>({ status: null, difficulty: null, stack: null, aiGenerated: null });
   search  = signal('');
 
   private stacks = signal<StackSummary[]>([]);
@@ -95,7 +95,7 @@ export class MyQuestionsComponent implements OnInit, OnDestroy {
 
     // Restore state from the URL (deep-linkable / copy-pasteable).
     const qp = this.route.snapshot.queryParamMap;
-    this.filters.set({ status: qp.get('status'), difficulty: qp.get('difficulty'), stack: qp.get('stack') });
+    this.filters.set({ status: qp.get('status'), difficulty: qp.get('difficulty'), stack: qp.get('stack'), aiGenerated: qp.get('aiGenerated') });
     const sortKey = qp.get('sort');
     if (sortKey) this.sort.set({ key: sortKey, dir: qp.get('dir') === 'asc' ? 'asc' : 'desc' });
     const search = qp.get('search');
@@ -115,6 +115,7 @@ export class MyQuestionsComponent implements OnInit, OnDestroy {
       relativeTo: this.route,
       queryParams: {
         status: f['status'], difficulty: f['difficulty'], stack: f['stack'],
+        aiGenerated: f['aiGenerated'],
         search: this.search() || null,
         sort: isDefaultSort ? null : s.key,
         dir:  isDefaultSort ? null : s.dir,
@@ -140,6 +141,7 @@ export class MyQuestionsComponent implements OnInit, OnDestroy {
       stackId: this.selectedStackId(),
       difficulty: (f['difficulty'] as Difficulty | null) ?? undefined,
       search: this.search() || undefined,
+      aiGenerated: f['aiGenerated'] === 'true' ? true : undefined,
       sort: toBackendSortField(s.key),
       direction: s.dir,
       page: this.page(),
@@ -181,13 +183,19 @@ export class MyQuestionsComponent implements OnInit, OnDestroy {
     this.load();
   }
   clearFilters(): void {
-    this.filters.set({ status: null, difficulty: null, stack: null });
+    this.filters.set({ status: null, difficulty: null, stack: null, aiGenerated: null });
     this.search.set('');
     this.page.set(0);
     this.syncUrl();
     this.load();
   }
   onSearch(value: string): void { this.searchInput$.next(value); }
+
+  /** Toggle the "AI generated only" filter. */
+  toggleAiFilter(): void {
+    const next = this.filters()['aiGenerated'] === 'true' ? null : 'true';
+    this.setFilter('aiGenerated', next);
+  }
 
   /** Quick-filter the table from a stat card click. */
   filterByStatus(status: string | null): void {

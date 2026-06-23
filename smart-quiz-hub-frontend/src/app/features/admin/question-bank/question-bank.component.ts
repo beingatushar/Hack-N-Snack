@@ -58,7 +58,7 @@ export class QuestionBankComponent implements OnInit, OnDestroy {
 
   sort    = signal<SortState>({ key: 'updated', dir: 'desc' });
   filters = signal<Record<string, string | null>>({
-    status: null, difficulty: null, stack: null, creator: null, reviewer: null
+    status: null, difficulty: null, stack: null, creator: null, reviewer: null, aiGenerated: null
   });
 
   selectedIds = signal<Set<number>>(new Set());
@@ -115,7 +115,7 @@ export class QuestionBankComponent implements OnInit, OnDestroy {
     const qp = this.route.snapshot.queryParamMap;
     this.filters.set({
       status: qp.get('status'), difficulty: qp.get('difficulty'), stack: qp.get('stack'),
-      creator: qp.get('creator'), reviewer: qp.get('reviewer'),
+      creator: qp.get('creator'), reviewer: qp.get('reviewer'), aiGenerated: qp.get('aiGenerated'),
     });
     const sortKey = qp.get('sort');
     if (sortKey) this.sort.set({ key: sortKey, dir: qp.get('dir') === 'asc' ? 'asc' : 'desc' });
@@ -137,7 +137,7 @@ export class QuestionBankComponent implements OnInit, OnDestroy {
       relativeTo: this.route,
       queryParams: {
         status: f['status'], difficulty: f['difficulty'], stack: f['stack'],
-        creator: f['creator'], reviewer: f['reviewer'],
+        creator: f['creator'], reviewer: f['reviewer'], aiGenerated: f['aiGenerated'],
         sort: isDefaultSort ? null : s.key,
         dir:  isDefaultSort ? null : s.dir,
         page: this.page() > 0 ? this.page() : null,
@@ -165,6 +165,7 @@ export class QuestionBankComponent implements OnInit, OnDestroy {
       stackId: this.selectedStackId(),
       difficulty: (f['difficulty'] as Difficulty | null) ?? undefined,
       search: this.searchQuery() || undefined,
+      aiGenerated: f['aiGenerated'] === 'true' ? true : undefined,
       sort: toBackendSortField(s.key),
       direction: s.dir,
       page: this.page(),
@@ -189,10 +190,16 @@ export class QuestionBankComponent implements OnInit, OnDestroy {
     if (key !== 'creator' && key !== 'reviewer') this.load();
   }
   clearFilters(): void {
-    this.filters.set({ status: null, difficulty: null, stack: null, creator: null, reviewer: null });
+    this.filters.set({ status: null, difficulty: null, stack: null, creator: null, reviewer: null, aiGenerated: null });
     this.page.set(0);
     this.syncUrl();
     this.load();
+  }
+
+  /** Toggle the "AI generated only" filter. */
+  toggleAiFilter(): void {
+    const next = this.filters()['aiGenerated'] === 'true' ? null : 'true';
+    this.setFilter('aiGenerated', next);
   }
 
   prevPage(): void { if (this.page() > 0) { this.page.update(p => p - 1); this.syncUrl(); this.load(); } }

@@ -124,7 +124,8 @@ public class McqServiceImpl implements McqService {
     @Override
     @Transactional(readOnly = true)
     public PagedResponse<McqResponse> getMyQuestions(McqStatus status, Long stackId, Difficulty difficulty,
-                                                      String search, SmartQuizUserDetails currentUser, Pageable pageable) {
+                                                      String search, Boolean aiGenerated,
+                                                      SmartQuizUserDetails currentUser, Pageable pageable) {
         // Visibility: "my questions" are strictly the ones the current user authored.
         Specification<McqQuestion> spec = (root, query, cb) -> {
             var predicates = new ArrayList<jakarta.persistence.criteria.Predicate>();
@@ -135,6 +136,7 @@ public class McqServiceImpl implements McqService {
             else predicates.add(cb.notEqual(root.get("status"), McqStatus.AI_PENDING));
             if (stackId != null) predicates.add(cb.equal(root.get("stack").get("id"), stackId));
             if (difficulty != null) predicates.add(cb.equal(root.get("difficulty"), difficulty));
+            if (aiGenerated != null) predicates.add(cb.equal(root.get("aiGenerated"), aiGenerated));
             addStemSearch(predicates, search, root, cb);
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
         };
@@ -145,8 +147,9 @@ public class McqServiceImpl implements McqService {
     @Override
     @Transactional(readOnly = true)
     public PagedResponse<McqResponse> getAllQuestions(McqStatus status, Long stackId, Difficulty difficulty,
-                                                       String search, SmartQuizUserDetails currentUser, Pageable pageable) {
-        Specification<McqQuestion> spec = buildSpec(status, stackId, difficulty, search, currentUser);
+                                                       String search, Boolean aiGenerated,
+                                                       SmartQuizUserDetails currentUser, Pageable pageable) {
+        Specification<McqQuestion> spec = buildSpec(status, stackId, difficulty, search, aiGenerated, currentUser);
         Page<McqQuestion> page = mcqRepo.findAll(spec, pageable);
         return PagedResponse.of(page.map(McqMapper::toResponse));
     }
@@ -731,7 +734,8 @@ public class McqServiceImpl implements McqService {
     }
 
     private Specification<McqQuestion> buildSpec(McqStatus status, Long stackId, Difficulty difficulty,
-                                                   String search, SmartQuizUserDetails currentUser) {
+                                                   String search, Boolean aiGenerated,
+                                                   SmartQuizUserDetails currentUser) {
         return (root, query, cb) -> {
             var predicates = new ArrayList<jakarta.persistence.criteria.Predicate>();
 
@@ -741,9 +745,13 @@ public class McqServiceImpl implements McqService {
                         cb.equal(root.get("reviewer").get("id"), currentUser.getUserId())
                 ));
             }
+            // AI-pending questions are still awaiting the creator's review — keep them out of the
+            // shared bank unless explicitly requested via the status filter.
             if (status != null) predicates.add(cb.equal(root.get("status"), status));
+            else predicates.add(cb.notEqual(root.get("status"), McqStatus.AI_PENDING));
             if (stackId != null) predicates.add(cb.equal(root.get("stack").get("id"), stackId));
             if (difficulty != null) predicates.add(cb.equal(root.get("difficulty"), difficulty));
+            if (aiGenerated != null) predicates.add(cb.equal(root.get("aiGenerated"), aiGenerated));
             addStemSearch(predicates, search, root, cb);
 
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));

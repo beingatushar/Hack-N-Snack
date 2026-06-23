@@ -66,6 +66,7 @@ public class McqController {
             @RequestParam(required = false) Long stackId,
             @RequestParam(required = false) Difficulty difficulty,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) Boolean aiGenerated,
             @RequestParam(defaultValue = "updatedAt") String sort,
             @RequestParam(defaultValue = "desc") String direction,
             @RequestParam(defaultValue = "0") int page,
@@ -73,7 +74,7 @@ public class McqController {
             @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
         var pageable = PageRequest.of(page, size, resolveSort(sort, direction));
         return ResponseEntity.ok(ApiResponse.success(
-                mcqService.getMyQuestions(status, stackId, difficulty, search, currentUser, pageable)));
+                mcqService.getMyQuestions(status, stackId, difficulty, search, aiGenerated, currentUser, pageable)));
     }
 
     @GetMapping
@@ -83,6 +84,7 @@ public class McqController {
             @RequestParam(required = false) Long stackId,
             @RequestParam(required = false) Difficulty difficulty,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) Boolean aiGenerated,
             @RequestParam(defaultValue = "updatedAt") String sort,
             @RequestParam(defaultValue = "desc") String direction,
             @RequestParam(defaultValue = "0") int page,
@@ -90,7 +92,7 @@ public class McqController {
             @AuthenticationPrincipal SmartQuizUserDetails currentUser) {
         var pageable = PageRequest.of(page, size, resolveSort(sort, direction));
         return ResponseEntity.ok(ApiResponse.success(
-                mcqService.getAllQuestions(status, stackId, difficulty, search, currentUser, pageable)));
+                mcqService.getAllQuestions(status, stackId, difficulty, search, aiGenerated, currentUser, pageable)));
     }
 
     /**

@@ -24,10 +24,12 @@ public interface McqService {
     McqResponse getQuestion(Long id, SmartQuizUserDetails currentUser);
 
     PagedResponse<McqResponse> getMyQuestions(McqStatus status, Long stackId, Difficulty difficulty,
-                                               String search, SmartQuizUserDetails currentUser, Pageable pageable);
+                                               String search, Boolean aiGenerated,
+                                               SmartQuizUserDetails currentUser, Pageable pageable);
 
     PagedResponse<McqResponse> getAllQuestions(McqStatus status, Long stackId, Difficulty difficulty,
-                                                String search, SmartQuizUserDetails currentUser, Pageable pageable);
+                                                String search, Boolean aiGenerated,
+                                                SmartQuizUserDetails currentUser, Pageable pageable);
 
     McqResponse submitForReview(Long id, SmartQuizUserDetails currentUser);
 

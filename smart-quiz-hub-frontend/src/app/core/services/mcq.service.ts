@@ -16,6 +16,7 @@ export interface McqListQuery {
   stackId?: number;
   difficulty?: Difficulty;
   search?: string;
+  aiGenerated?: boolean;
   sort?: McqSortField;
   direction?: 'asc' | 'desc';
   page?: number;
@@ -61,6 +62,7 @@ export class McqService {
     if (f.stackId)    params = params.set('stackId', f.stackId);
     if (f.difficulty) params = params.set('difficulty', f.difficulty);
     if (f.search?.trim()) params = params.set('search', f.search.trim());
+    if (f.aiGenerated) params = params.set('aiGenerated', true);
     if (f.sort)      params = params.set('sort', f.sort);
     if (f.direction) params = params.set('direction', f.direction);
     return params;
