@@ -244,7 +244,11 @@ Reset DB and re-run all migrations: `docker compose down -v && docker compose up
 
 ## Default Users (seeded by V1 migration)
 
-| Enterprise ID | Role | Password |
-|---|---|---|
-| `ADMIN001` | ADMIN | `Admin@123` |
-| `SME001`–`SME005` | SME | `Sme@12345` |
+| Enterprise ID | Name | Role | Password |
+|---|---|---|---|
+| `admin.user` | System Admin | ADMIN | `Admin@123` |
+| `birendra.kumar.singh` | Birendra Kumar Singh | SME | `Admin@123` |
+| `divya.madhanasekar` | Divya Madhanasekar | SME | `Admin@123` |
+| `gaurav.a.bhola` | Gaurav Bhola | SME | `Admin@123` |
+| `indugu.hari.prasad` | Indugu Hari Prasad | SME | `Admin@123` |
+| `swati.avinash.nikam` | Swati Avinash Nikam | SME | `Admin@123` |
